@@ -179,9 +179,9 @@ export const gameDataTransformation: DataTransformation = {
             break;
           case 'traversal':
             // Boolean flags for trench/bump usage in auto
-            if (wp.action === 'trench') {
+            if (wp.action === 'trench' || wp.action === 'trench1' || wp.action === 'trench2') {
               result.auto.autoTrench = true;
-            } else if (wp.action === 'bump') {
+            } else if (wp.action === 'bump' || wp.action === 'bump1' || wp.action === 'bump2') {
               result.auto.autoBump = true;
             } else if (wp.action === 'trench-stuck') {
               // Legacy: traversal-stuck from old flow (no duration)

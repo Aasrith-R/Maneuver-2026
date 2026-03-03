@@ -93,6 +93,8 @@ export interface FieldCanvasProps {
     drawConnectedPaths?: boolean;
     /** Optional zone bounds to show as visual boundary indicator when drawing */
     drawingZoneBounds?: { xMin: number; xMax: number; yMin: number; yMax: number };
+    /** Optional replay progress (0-1) for progressive path drawing. If omitted, paths render fully. */
+    replayDrawProgress?: number;
     onPointerDown?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
     onPointerMove?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
     onPointerUp?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
