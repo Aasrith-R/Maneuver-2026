@@ -89,11 +89,12 @@ export async function submitMatchData({
     onSuccess,
     onError,
 }: SubmitOptions): Promise<boolean> {
-    const maybeRecordCommentAchievement = async () => {
+    const maybeRecordCommentAchievement = async (existingComment?: unknown) => {
         const hasScoutName = typeof inputs.scoutName === 'string' && inputs.scoutName.trim().length > 0;
         const hasSubstantiveComment = typeof comment === 'string' && isSubstantiveComment(comment);
+        const existingWasSubstantive = typeof existingComment === 'string' && isSubstantiveComment(existingComment);
 
-        if (!hasScoutName || !hasSubstantiveComment) {
+        if (!hasScoutName || !hasSubstantiveComment || existingWasSubstantive) {
             return;
         }
 
@@ -107,11 +108,13 @@ export async function submitMatchData({
             inputs.matchType || 'qm',
             inputs.matchNumber
         );
+        const entryId = `${inputs.eventKey}::${matchKey}::${inputs.selectTeam}::${inputs.alliance}`;
+        const existingEntry = await db.scoutingData.get(entryId);
 
         // For no-show, skip data collection and submit minimal entry
         if (noShow) {
             const entry: Record<string, unknown> = {
-                id: `${inputs.eventKey}::${matchKey}::${inputs.selectTeam}::${inputs.alliance}`,
+                id: entryId,
                 scoutName: inputs.scoutName || '',
                 teamNumber: parseInt(inputs.selectTeam) || 0,
                 matchNumber: numericMatch,
@@ -131,7 +134,7 @@ export async function submitMatchData({
             await db.scoutingData.put(entry as never);
 
             try {
-                await maybeRecordCommentAchievement();
+                await maybeRecordCommentAchievement(existingEntry?.comments);
             } catch (gamificationError) {
                 console.warn('Failed to process comment achievement tracking:', gamificationError);
             }
@@ -164,7 +167,7 @@ export async function submitMatchData({
 
         // Create the scouting entry
         const scoutingEntry: Record<string, unknown> = {
-            id: `${inputs.eventKey}::${matchKey}::${inputs.selectTeam}::${inputs.alliance}`,
+            id: entryId,
             scoutName: inputs.scoutName || '',
             teamNumber: parseInt(inputs.selectTeam) || 0,
             matchNumber: numericMatch,
@@ -180,7 +183,7 @@ export async function submitMatchData({
         await db.scoutingData.put(scoutingEntry as never);
 
         try {
-            await maybeRecordCommentAchievement();
+            await maybeRecordCommentAchievement(existingEntry?.comments);
         } catch (gamificationError) {
             console.warn('Failed to process comment achievement tracking:', gamificationError);
         }

@@ -140,7 +140,9 @@ export const handleScoutProfilesUpload = async (jsonData: unknown, mode: UploadM
             const shouldUpdate =
               scout.lastUpdated > existing.lastUpdated ||
               scout.stakes > existing.stakes ||
-              scout.totalPredictions > existing.totalPredictions;
+              scout.totalPredictions > existing.totalPredictions ||
+              scout.stakesFromPredictions > existing.stakesFromPredictions ||
+              scout.detailedCommentsCount > existing.detailedCommentsCount;
 
             if (shouldUpdate) {
               await gameDB.scouts.update(scout.name, {
