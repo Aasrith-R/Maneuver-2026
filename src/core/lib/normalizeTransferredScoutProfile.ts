@@ -1,7 +1,21 @@
 import type { Scout } from "@/core/types/gamification";
 
 const asNumber = (value: unknown, fallback: number): number => {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed !== "") {
+      const parsed = Number(trimmed);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+
+  return fallback;
 };
 
 /**

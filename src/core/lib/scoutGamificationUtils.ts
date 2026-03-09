@@ -10,6 +10,7 @@
 
 import type { Scout } from '@/game-template/gamification';
 import type { Achievement } from './achievementTypes';
+import { isSubstantiveComment } from './commentValidation';
 import {
   STAKE_VALUES,
   calculateStreakBonus,
@@ -71,18 +72,6 @@ export const updateScoutWithPredictionAndAchievements = async (
   await updateScoutWithPredictionResult(name, isCorrect, basePoints, eventKey, matchNumber);
   const newAchievements = await checkForNewAchievements(name);
   return { newAchievements };
-};
-
-const MIN_DETAILED_COMMENT_LENGTH = 25;
-
-const isSubstantiveComment = (comment: string): boolean => {
-  const normalized = comment.trim().replace(/\s+/g, ' ');
-  if (normalized.length < MIN_DETAILED_COMMENT_LENGTH) {
-    return false;
-  }
-
-  const words = normalized.split(' ').filter(Boolean);
-  return words.length >= 5;
 };
 
 export const recordMatchCommentForAchievements = async (

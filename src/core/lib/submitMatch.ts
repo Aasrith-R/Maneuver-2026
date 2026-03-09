@@ -6,6 +6,7 @@
  */
 
 import { db } from '@/core/db/database';
+import { isSubstantiveComment } from '@/core/lib/commentValidation';
 import { clearScoutingLocalStorage } from '@/core/lib/utils';
 import { toast } from 'sonner';
 import type { DataTransformation } from '@/types';
@@ -90,9 +91,9 @@ export async function submitMatchData({
 }: SubmitOptions): Promise<boolean> {
     const maybeRecordCommentAchievement = async () => {
         const hasScoutName = typeof inputs.scoutName === 'string' && inputs.scoutName.trim().length > 0;
-        const hasComment = typeof comment === 'string' && comment.trim().length > 0;
+        const hasSubstantiveComment = typeof comment === 'string' && isSubstantiveComment(comment);
 
-        if (!hasScoutName || !hasComment) {
+        if (!hasScoutName || !hasSubstantiveComment) {
             return;
         }
 
