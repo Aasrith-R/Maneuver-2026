@@ -23,6 +23,7 @@ import ConflictResolutionDialog from "@/core/components/data-transfer/ConflictRe
 import { BatchConflictDialog } from "@/core/components/data-transfer/BatchConflictDialog";
 import type { ScoutingEntryBase } from "@/core/types/scouting-entry";
 import type { ConflictInfo } from "@/core/lib/scoutingDataUtils";
+import { normalizeTransferredScoutProfile } from "@/core/lib/normalizeTransferredScoutProfile";
 import { toast } from "sonner";
 
 type DataType = 'scouting' | 'match' | 'scout' | 'combined' | 'pit-scouting';
@@ -38,14 +39,6 @@ interface DataTypeConfig {
     completionMessage: string;
     expectedPacketType: string;
 }
-
-const normalizeTransferredScout = (scout: unknown): Record<string, unknown> => {
-    const value = (scout && typeof scout === 'object') ? scout as Record<string, unknown> : {};
-    return {
-        ...value,
-        detailedCommentsCount: typeof value.detailedCommentsCount === 'number' ? value.detailedCommentsCount : 0,
-    };
-};
 
 const QRDataTransferPage = () => {
     const [mode, setMode] = useState<'select' | 'generate' | 'scan'>('select');
@@ -241,8 +234,10 @@ const QRDataTransferPage = () => {
                 let scoutCount = 0;
                 if (profileData.scouts) {
                     for (const scout of profileData.scouts) {
-                        await gamificationDB.scouts.put(normalizeTransferredScout(scout) as never);
-                        scoutCount++;
+                        const normalizedScout = normalizeTransferredScoutProfile(scout);
+                        if (!normalizedScout) continue;
+                        await gamificationDB.scouts.put(normalizedScout as never);
+                        scoutCount += 1;
                     }
                 }
                 if (profileData.predictions) {
@@ -318,7 +313,9 @@ const QRDataTransferPage = () => {
                 // Scout profiles don't need conflict detection - just merge
                 if (combinedData.scoutProfiles?.scouts) {
                     for (const scout of combinedData.scoutProfiles.scouts) {
-                        await gamificationDB.scouts.put(normalizeTransferredScout(scout) as never);
+                        const normalizedScout = normalizeTransferredScoutProfile(scout);
+                        if (!normalizedScout) continue;
+                        await gamificationDB.scouts.put(normalizedScout as never);
                     }
                 }
                 if (combinedData.scoutProfiles?.predictions) {

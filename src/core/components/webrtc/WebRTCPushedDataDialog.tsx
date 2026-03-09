@@ -14,6 +14,7 @@ import {
 } from '@/core/lib/pitAssignmentTransfer';
 import { pitDB, saveScoutingEntries } from '@/core/db/database';
 import { gamificationDB as gameDB } from '@/game-template/gamification';
+import { normalizeTransferredScoutProfile } from '@/core/lib/normalizeTransferredScoutProfile';
 import { toast } from 'sonner';
 import { Button } from '@/core/components/ui/button';
 import {
@@ -26,14 +27,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/core/components/ui/alert-dialog';
-
-const normalizeTransferredScout = (scout: unknown): Record<string, unknown> => {
-  const value = (scout && typeof scout === 'object') ? scout as Record<string, unknown> : {};
-  return {
-    ...value,
-    detailedCommentsCount: typeof value.detailedCommentsCount === 'number' ? value.detailedCommentsCount : 0,
-  };
-};
 
 export function WebRTCPushedDataDialog() {
   const context = useWebRTC();
@@ -132,7 +125,9 @@ export function WebRTCPushedDataDialog() {
         if (data.scoutProfiles) {
           if (data.scoutProfiles.scouts && Array.isArray(data.scoutProfiles.scouts)) {
             for (const scout of data.scoutProfiles.scouts) {
-              await gameDB.scouts.put(normalizeTransferredScout(scout) as never);
+              const normalizedScout = normalizeTransferredScoutProfile(scout);
+              if (!normalizedScout) continue;
+              await gameDB.scouts.put(normalizedScout as never);
             }
             importedCount += data.scoutProfiles.scouts.length;
             console.log('✅ Imported', data.scoutProfiles.scouts.length, 'scout profiles');
@@ -237,7 +232,9 @@ export function WebRTCPushedDataDialog() {
         const data = pushedData as any;
         if (data.scouts && Array.isArray(data.scouts)) {
           for (const scout of data.scouts) {
-            await gameDB.scouts.put(normalizeTransferredScout(scout) as never);
+            const normalizedScout = normalizeTransferredScoutProfile(scout);
+            if (!normalizedScout) continue;
+            await gameDB.scouts.put(normalizedScout as never);
           }
           importedCount = data.scouts.length;
           console.log('✅ Imported', importedCount, 'scout profiles');

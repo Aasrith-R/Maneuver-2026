@@ -7,7 +7,6 @@
 
 import { db } from '@/core/db/database';
 import { clearScoutingLocalStorage } from '@/core/lib/utils';
-import { recordMatchCommentForAchievements } from '@/core/lib/scoutGamificationUtils';
 import { toast } from 'sonner';
 import type { DataTransformation } from '@/types';
 
@@ -89,6 +88,18 @@ export async function submitMatchData({
     onSuccess,
     onError,
 }: SubmitOptions): Promise<boolean> {
+    const maybeRecordCommentAchievement = async () => {
+        const hasScoutName = typeof inputs.scoutName === 'string' && inputs.scoutName.trim().length > 0;
+        const hasComment = typeof comment === 'string' && comment.trim().length > 0;
+
+        if (!hasScoutName || !hasComment) {
+            return;
+        }
+
+        const { recordMatchCommentForAchievements } = await import('@/core/lib/scoutGamificationUtils');
+        await recordMatchCommentForAchievements(inputs.scoutName, comment);
+    };
+
     try {
         // Build match key
         const { matchKey, numericMatch } = buildMatchKey(
@@ -119,7 +130,7 @@ export async function submitMatchData({
             await db.scoutingData.put(entry as never);
 
             try {
-                await recordMatchCommentForAchievements(inputs.scoutName || '', comment);
+                await maybeRecordCommentAchievement();
             } catch (gamificationError) {
                 console.warn('Failed to process comment achievement tracking:', gamificationError);
             }
@@ -168,7 +179,7 @@ export async function submitMatchData({
         await db.scoutingData.put(scoutingEntry as never);
 
         try {
-            await recordMatchCommentForAchievements(inputs.scoutName || '', comment);
+            await maybeRecordCommentAchievement();
         } catch (gamificationError) {
             console.warn('Failed to process comment achievement tracking:', gamificationError);
         }

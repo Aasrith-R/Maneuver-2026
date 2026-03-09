@@ -10,6 +10,7 @@ import { importPitAssignmentsPayload, type PitAssignmentTransferPayload } from '
 import type { ScoutingEntryBase } from '@/core/types/scouting-entry';
 import { debugLog } from '@/core/lib/peerTransferUtils';
 import { db, pitDB, saveScoutingEntry } from '@/core/db/database';
+import { normalizeTransferredScoutProfile } from '@/core/lib/normalizeTransferredScoutProfile';
 
 const getSafeJsonSize = (value: unknown): number => {
     const seen = new WeakSet<object>();
@@ -71,23 +72,17 @@ export function usePeerTransferImport(options: UsePeerTransferImportOptions) {
         setShowErrorDialog,
     } = options;
 
-    const normalizeTransferredScout = (scout: unknown): Record<string, unknown> => {
-        const value = (scout && typeof scout === 'object') ? scout as Record<string, unknown> : {};
-        return {
-            ...value,
-            detailedCommentsCount: typeof value.detailedCommentsCount === 'number' ? value.detailedCommentsCount : 0,
-        };
-    };
-
     const importScoutProfiles = useCallback(async (scoutData: { scouts?: unknown[]; predictions?: unknown[]; achievements?: unknown[] }) => {
         const { gamificationDB } = await import('@/game-template/gamification/database');
         let importedCount = 0;
 
         if (scoutData.scouts && Array.isArray(scoutData.scouts)) {
-            const normalizedScouts = scoutData.scouts.map((scout) => normalizeTransferredScout(scout));
+            const normalizedScouts = scoutData.scouts
+                .map((scout) => normalizeTransferredScoutProfile(scout))
+                .filter((scout): scout is NonNullable<ReturnType<typeof normalizeTransferredScoutProfile>> => !!scout);
             await gamificationDB.scouts.bulkPut(normalizedScouts as never[]);
-            importedCount += scoutData.scouts.length;
-            console.log(`✅ Imported ${scoutData.scouts.length} scouts`);
+            importedCount += normalizedScouts.length;
+            console.log(`✅ Imported ${normalizedScouts.length} scouts`);
         }
         if (scoutData.predictions && Array.isArray(scoutData.predictions)) {
             await gamificationDB.predictions.bulkPut(scoutData.predictions as never[]);

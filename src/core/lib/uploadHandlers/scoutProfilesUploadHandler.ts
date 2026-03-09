@@ -1,21 +1,43 @@
 import { toast } from "sonner";
 import { gamificationDB as gameDB, type Scout, type MatchPrediction } from "@/game-template/gamification";
+import { normalizeTransferredScoutProfile } from "@/core/lib/normalizeTransferredScoutProfile";
 import type { UploadMode } from "./scoutingDataUploadHandler";
 
-const normalizeScout = (scout: Scout): Scout => ({
-  ...scout,
-  detailedCommentsCount: typeof scout.detailedCommentsCount === 'number' ? scout.detailedCommentsCount : 0,
-});
+const isValidPrediction = (prediction: unknown): prediction is MatchPrediction => {
+  if (!prediction || typeof prediction !== 'object') {
+    return false;
+  }
+
+  const value = prediction as Record<string, unknown>;
+  return (
+    typeof value.id === 'string' &&
+    typeof value.scoutName === 'string' &&
+    typeof value.eventKey === 'string' &&
+    typeof value.matchNumber === 'number' &&
+    (value.predictedWinner === 'red' || value.predictedWinner === 'blue') &&
+    typeof value.timestamp === 'number' &&
+    typeof value.verified === 'boolean'
+  );
+};
 
 export const handleScoutProfilesUpload = async (jsonData: unknown, mode: UploadMode): Promise<void> => {
-  if (!jsonData || typeof jsonData !== 'object' || !('scouts' in jsonData) || !('predictions' in jsonData)) {
+  if (!jsonData || typeof jsonData !== 'object') {
     toast.error("Invalid scout profiles format");
     return;
   }
 
-  const data = jsonData as { scouts: Scout[]; predictions: MatchPrediction[] };
-  const scoutsToImport = (data.scouts || []).map(normalizeScout);
-  const predictionsToImport = data.predictions || [];
+  const data = jsonData as { scouts?: unknown; predictions?: unknown };
+
+  if (!Array.isArray(data.scouts) || !Array.isArray(data.predictions)) {
+    toast.error("Invalid scout profiles format");
+    return;
+  }
+
+  const scoutsToImport = data.scouts
+    .map((scout) => normalizeTransferredScoutProfile(scout))
+    .filter((scout): scout is Scout => !!scout);
+
+  const predictionsToImport = data.predictions.filter(isValidPrediction);
 
   try {
     let scoutsAdded = 0;
