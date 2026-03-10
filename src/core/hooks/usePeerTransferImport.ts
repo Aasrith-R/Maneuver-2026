@@ -12,7 +12,9 @@ import { debugLog } from '@/core/lib/peerTransferUtils';
 import { db, pitDB, saveScoutingEntry } from '@/core/db/database';
 import { normalizeTransferredScoutProfile } from '@/core/lib/normalizeTransferredScoutProfile';
 import { normalizeTransferredMatchPrediction } from '@/core/lib/normalizeTransferredMatchPrediction';
+import { normalizeTransferredScoutAchievement } from '@/core/lib/normalizeTransferredScoutAchievement';
 import type { MatchPrediction } from '@/game-template/gamification';
+import type { ScoutAchievement } from '@/game-template/gamification';
 
 const getSafeJsonSize = (value: unknown): number => {
     const seen = new WeakSet<object>();
@@ -95,9 +97,12 @@ export function usePeerTransferImport(options: UsePeerTransferImportOptions) {
             console.log(`✅ Imported ${normalizedPredictions.length} predictions`);
         }
         if (scoutData.achievements && Array.isArray(scoutData.achievements)) {
-            await gamificationDB.scoutAchievements.bulkPut(scoutData.achievements as never[]);
-            importedCount += scoutData.achievements.length;
-            console.log(`✅ Imported ${scoutData.achievements.length} achievements`);
+            const normalizedAchievements = scoutData.achievements
+                .map((achievement) => normalizeTransferredScoutAchievement(achievement))
+                .filter((achievement): achievement is ScoutAchievement => !!achievement);
+            await gamificationDB.scoutAchievements.bulkPut(normalizedAchievements as never[]);
+            importedCount += normalizedAchievements.length;
+            console.log(`✅ Imported ${normalizedAchievements.length} achievements`);
         }
 
         return importedCount;

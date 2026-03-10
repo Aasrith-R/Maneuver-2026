@@ -15,6 +15,8 @@ import {
 import { pitDB, saveScoutingEntries } from '@/core/db/database';
 import { gamificationDB as gameDB } from '@/game-template/gamification';
 import { normalizeTransferredScoutProfile } from '@/core/lib/normalizeTransferredScoutProfile';
+import { normalizeTransferredMatchPrediction } from '@/core/lib/normalizeTransferredMatchPrediction';
+import { normalizeTransferredScoutAchievement } from '@/core/lib/normalizeTransferredScoutAchievement';
 import { toast } from 'sonner';
 import { Button } from '@/core/components/ui/button';
 import {
@@ -137,10 +139,14 @@ export function WebRTCPushedDataDialog() {
 
           // Import predictions
           if (data.scoutProfiles.predictions && Array.isArray(data.scoutProfiles.predictions)) {
+            let importedPredictionCount = 0;
             for (const prediction of data.scoutProfiles.predictions) {
-              await gameDB.predictions.put(prediction);
+              const normalizedPrediction = normalizeTransferredMatchPrediction(prediction);
+              if (!normalizedPrediction) continue;
+              await gameDB.predictions.put(normalizedPrediction as never);
+              importedPredictionCount += 1;
             }
-            console.log('✅ Imported', data.scoutProfiles.predictions.length, 'predictions');
+            console.log('✅ Imported', importedPredictionCount, 'predictions');
           }
         }
 
@@ -244,16 +250,24 @@ export function WebRTCPushedDataDialog() {
           console.log('✅ Imported', importedCount, 'scout profiles');
         }
         if (data.predictions && Array.isArray(data.predictions)) {
+          let importedPredictionCount = 0;
           for (const prediction of data.predictions) {
-            await gameDB.predictions.put(prediction);
+            const normalizedPrediction = normalizeTransferredMatchPrediction(prediction);
+            if (!normalizedPrediction) continue;
+            await gameDB.predictions.put(normalizedPrediction as never);
+            importedPredictionCount += 1;
           }
-          console.log('✅ Imported', data.predictions.length, 'predictions');
+          console.log('✅ Imported', importedPredictionCount, 'predictions');
         }
         if (data.achievements && Array.isArray(data.achievements)) {
+          let importedAchievementCount = 0;
           for (const achievement of data.achievements) {
-            await gameDB.scoutAchievements.put(achievement);
+            const normalizedAchievement = normalizeTransferredScoutAchievement(achievement);
+            if (!normalizedAchievement) continue;
+            await gameDB.scoutAchievements.put(normalizedAchievement as never);
+            importedAchievementCount += 1;
           }
-          console.log('✅ Imported', data.achievements.length, 'achievements');
+          console.log('✅ Imported', importedAchievementCount, 'achievements');
         }
       }
 
