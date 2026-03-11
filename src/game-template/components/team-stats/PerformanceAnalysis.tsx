@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/c
 import { Badge } from "@/core/components/ui/badge";
 import { ProgressCard } from "@/core/components/team-stats/ProgressCard";
 import { MatchProgressionChart } from "@/core/components/team-stats/MatchProgressionChart";
+import type { MatchProgressionMatchResult } from "@/core/components/team-stats/MatchProgressionChart";
 import { MatchStatsDialog } from "./MatchStatsDialog";
 import type { TeamStats } from "@/core/types/team-stats";
 import type { RateSectionDefinition, MatchBadgeDefinition } from "@/types/team-stats-display";
@@ -156,31 +157,9 @@ export function PerformanceAnalysis({
         <div className="space-y-6 pb-6">
             {hasMatchResults && (
                 <MatchProgressionChart
-                    matchResults={matchResults as Array<{
-                        matchNumber: string;
-                        eventKey?: string;
-                        totalPoints: number;
-                        autoPoints: number;
-                        teleopPoints: number;
-                        endgamePoints: number;
-                        autoFuel?: number;
-                        teleopFuel?: number;
-                        fuelPassed?: number;
-                        climbLevel?: number;
-                    }>}
+                    matchResults={matchResults as MatchProgressionMatchResult[]}
                     compareMatchResults={Array.isArray(compareMatchResults)
-                        ? compareMatchResults as Array<{
-                            matchNumber: string;
-                            eventKey?: string;
-                            totalPoints: number;
-                            autoPoints: number;
-                            teleopPoints: number;
-                            endgamePoints: number;
-                            autoFuel?: number;
-                            teleopFuel?: number;
-                            fuelPassed?: number;
-                            climbLevel?: number;
-                        }>
+                        ? compareMatchResults as MatchProgressionMatchResult[]
                         : undefined}
                     teamNumber={teamStats.teamNumber}
                     compareTeamNumber={compareStats?.teamNumber}

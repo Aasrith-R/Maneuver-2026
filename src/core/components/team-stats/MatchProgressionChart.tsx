@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/core/components/ui/card";
 import { GenericSelector } from "@/core/components/ui/generic-selector";
 import { ChartContainer } from "@/core/components/ui/chart";
+import { getDistributedColor } from "@/core/lib/chartColors";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { TrendingUp } from "lucide-react";
 
-interface MatchResult {
+export interface MatchProgressionMatchResult {
     matchNumber: string;
     eventKey?: string;
     totalPoints: number;
@@ -20,8 +21,8 @@ interface MatchResult {
 }
 
 interface MatchProgressionChartProps {
-    matchResults: MatchResult[];
-    compareMatchResults?: MatchResult[];
+    matchResults: MatchProgressionMatchResult[];
+    compareMatchResults?: MatchProgressionMatchResult[];
     teamNumber: number;
     compareTeamNumber?: number;
 }
@@ -37,19 +38,13 @@ const metricOptions = [
     { key: 'climbLevel', label: 'Climb Level' },
 ];
 
-const PRIMARY_EVENT_COLORS = [
-    "hsl(0, 0%, 100%)",
-    "hsl(170, 80%, 55%)",
-    "hsl(28, 95%, 60%)",
-    "hsl(92, 70%, 58%)",
-];
-
-const COMPARE_EVENT_COLORS = [
-    "hsl(270, 95%, 75%)",
-    "hsl(305, 80%, 68%)",
-    "hsl(245, 85%, 72%)",
-    "hsl(330, 78%, 70%)",
-];
+function getSeriesColor(index: number, dashed: boolean): string {
+    return getDistributedColor(index, {
+        baseHue: dashed ? 280 : 210,
+        saturation: dashed ? 68 : 82,
+        lightness: dashed ? 64 : 54,
+    });
+}
 
 interface ChartSeries {
     key: string;
@@ -58,14 +53,14 @@ interface ChartSeries {
     dashed: boolean;
 }
 
-function getEventKey(match: MatchResult): string {
+function getEventKey(match: MatchProgressionMatchResult): string {
     if (typeof match.eventKey === 'string' && match.eventKey.trim() !== '') {
         return match.eventKey;
     }
     return 'unknown-event';
 }
 
-function getMatchNumber(match: MatchResult): number {
+function getMatchNumber(match: MatchProgressionMatchResult): number {
     const parsed = Number.parseInt(String(match.matchNumber), 10);
     if (Number.isFinite(parsed)) {
         return parsed;
@@ -73,8 +68,8 @@ function getMatchNumber(match: MatchResult): number {
     return 0;
 }
 
-function getMetricValue(match: MatchResult, metricKey: string): number {
-    const raw = match[metricKey as keyof MatchResult];
+function getMetricValue(match: MatchProgressionMatchResult, metricKey: string): number {
+    const raw = match[metricKey as keyof MatchProgressionMatchResult];
     if (typeof raw === 'number' && Number.isFinite(raw)) {
         return raw;
     }
@@ -82,16 +77,15 @@ function getMetricValue(match: MatchResult, metricKey: string): number {
 }
 
 function buildSeries(
-    matches: MatchResult[],
+    matches: MatchProgressionMatchResult[],
     teamNumber: number,
-    colors: string[],
     dashed: boolean
 ): ChartSeries[] {
     const events = [...new Set(matches.map(getEventKey))].sort();
     return events.map((eventKey, index) => ({
         key: `team_${teamNumber}_${eventKey}`,
         label: `Team ${teamNumber} (${eventKey})`,
-        color: colors[index % colors.length] ?? "hsl(0, 0%, 100%)",
+        color: getSeriesColor(index, dashed),
         dashed,
     }));
 }
@@ -104,9 +98,9 @@ export function MatchProgressionChart({
 }: MatchProgressionChartProps) {
     const [selectedMetric, setSelectedMetric] = useState('totalPoints');
 
-    const primarySeries = buildSeries(matchResults, teamNumber, PRIMARY_EVENT_COLORS, false);
+    const primarySeries = buildSeries(matchResults, teamNumber, false);
     const compareSeries = compareTeamNumber
-        ? buildSeries(compareMatchResults ?? [], compareTeamNumber, COMPARE_EVENT_COLORS, true)
+        ? buildSeries(compareMatchResults ?? [], compareTeamNumber, true)
         : [];
     const allSeries = [...primarySeries, ...compareSeries];
 
