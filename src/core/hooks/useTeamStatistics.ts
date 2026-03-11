@@ -43,17 +43,13 @@ export const useTeamStatistics = (
     aggregationType: AggregationType = 'average'
 ): UseTeamStatisticsResult => {
     const selectedEventKeys = useMemo(() => normalizeEventFilter(eventFilter), [eventFilter]);
-    const singleEventKey = selectedEventKeys.length === 1 ? selectedEventKeys[0] : undefined;
 
-    // Always load unfiltered stats for stable event option lists.
-    const { teamStats: allEventsTeamStats } = useAllTeamStats();
-
-    // Get centralized team stats
-    const { teamStats: allTeamStats, isLoading, error } = useAllTeamStats(singleEventKey);
+    // Load once and apply event filtering in this hook to avoid duplicate IndexedDB reads.
+    const { teamStats: allTeamStats, isLoading, error } = useAllTeamStats();
 
     const availableEvents = useMemo(() => {
-        return Array.from(new Set(allEventsTeamStats.map((team) => team.eventKey).filter(Boolean))).sort();
-    }, [allEventsTeamStats]);
+        return Array.from(new Set(allTeamStats.map((team) => team.eventKey).filter(Boolean))).sort();
+    }, [allTeamStats]);
 
     const filteredSourceTeamStats = useMemo(() => {
         if (selectedEventKeys.length === 0) {
@@ -105,9 +101,10 @@ export const useTeamStatistics = (
         const consolidated: TeamData[] = [];
 
         for (const [teamNumber, rows] of byTeam.entries()) {
+            const consolidatedEventKey = selectedEventKeys.length === 0 ? 'all' : 'multiple';
             const merged: TeamData = {
                 teamNumber,
-                eventKey: 'all',
+                eventKey: consolidatedEventKey,
                 matchCount: rows.reduce((sum, row) => {
                     const count = typeof row.matchCount === 'number' ? row.matchCount : 0;
                     return sum + count;
@@ -129,6 +126,28 @@ export const useTeamStatistics = (
                     .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
 
                 if (numericValues.length > 0) {
+                    if (aggregationType === 'average') {
+                        const weighted = rows
+                            .map(row => {
+                                const value = row[key];
+                                const weight = typeof row.matchCount === 'number' ? row.matchCount : 0;
+                                return { value, weight };
+                            })
+                            .filter(
+                                (pair): pair is { value: number; weight: number } =>
+                                    typeof pair.value === 'number' &&
+                                    Number.isFinite(pair.value) &&
+                                    pair.weight > 0
+                            );
+
+                        const totalWeight = weighted.reduce((sum, pair) => sum + pair.weight, 0);
+                        if (totalWeight > 0) {
+                            const weightedSum = weighted.reduce((sum, pair) => sum + pair.value * pair.weight, 0);
+                            merged[key] = weightedSum / totalWeight;
+                            continue;
+                        }
+                    }
+
                     merged[key] = aggregateArray(numericValues, aggregationType);
                     continue;
                 }

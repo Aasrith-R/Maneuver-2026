@@ -31,7 +31,13 @@ interface TeamStatsPageProps {
      * Optional: Function to calculate team stats from scouting entries
      * Defaults to useTeamStats hook implementation
      */
-    calculateStats?: (teamNumber: string, eventFilter?: string | string[]) => Promise<TeamStats | null>;
+    calculateStats?: (teamNumber: string, eventFilter?: string) => Promise<TeamStats | null>;
+
+    /**
+     * Optional: Multi-event stats calculator for subset event filtering
+     * Falls back to useTeamStats hook implementation when not provided
+     */
+    calculateStatsMultiEvent?: (teamNumber: string, eventFilter?: string | string[]) => Promise<TeamStats | null>;
 
     /**
      * Optional: Stat sections configuration
@@ -94,7 +100,9 @@ export function TeamStatsPage(props: TeamStatsPageProps) {
     const rateSections = props.rateSections ?? displayConfig.rateSections;
     const matchBadges = props.matchBadges ?? displayConfig.matchBadges;
     const startPositionConfig = props.startPositionConfig ?? displayConfig.startPositionConfig;
-    const calculateStats = props.calculateStats ?? hookCalculate;
+    const calculateStatsSingle = props.calculateStats
+        ?? ((teamNumber: string, eventFilter?: string) => hookCalculate(teamNumber, eventFilter));
+    const calculateStatsMulti = props.calculateStatsMultiEvent ?? hookCalculate;
     const PitDataComponent = props.PitDataComponent ?? PitDataDisplay;
 
     const [selectedTeam, setSelectedTeam] = useState<string>("");
@@ -332,7 +340,9 @@ export function TeamStatsPage(props: TeamStatsPageProps) {
 
         const updateStats = async () => {
             if (selectedTeam) {
-                const stats = await calculateStats(selectedTeam, selectedEventFilter);
+                const stats = Array.isArray(selectedEventFilter)
+                    ? await calculateStatsMulti(selectedTeam, selectedEventFilter)
+                    : await calculateStatsSingle(selectedTeam, selectedEventFilter);
                 if (requestId === teamStatsRequestIdRef.current) {
                     setTeamStats(stats);
                 }
@@ -341,7 +351,7 @@ export function TeamStatsPage(props: TeamStatsPageProps) {
             }
         };
         updateStats();
-    }, [selectedTeam, selectedEventFilter, calculateStats, statsRefreshKey]);
+    }, [selectedTeam, selectedEventFilter, calculateStatsSingle, calculateStatsMulti, statsRefreshKey]);
 
     useEffect(() => {
         compareStatsRequestIdRef.current += 1;
@@ -349,7 +359,9 @@ export function TeamStatsPage(props: TeamStatsPageProps) {
 
         const updateCompareStats = async () => {
             if (compareTeam && compareTeam !== "none") {
-                const stats = await calculateStats(compareTeam, selectedEventFilter);
+                const stats = Array.isArray(selectedEventFilter)
+                    ? await calculateStatsMulti(compareTeam, selectedEventFilter)
+                    : await calculateStatsSingle(compareTeam, selectedEventFilter);
                 if (requestId === compareStatsRequestIdRef.current) {
                     setCompareStats(stats);
                 }
@@ -358,7 +370,7 @@ export function TeamStatsPage(props: TeamStatsPageProps) {
             }
         };
         updateCompareStats();
-    }, [compareTeam, selectedEventFilter, calculateStats, statsRefreshKey]);
+    }, [compareTeam, selectedEventFilter, calculateStatsSingle, calculateStatsMulti, statsRefreshKey]);
 
     return (
         <div className="min-h-screen w-full flex flex-col items-center px-4 pt-12 pb-24">
