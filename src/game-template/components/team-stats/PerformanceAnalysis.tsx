@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/core/components/ui/card";
 import { Badge } from "@/core/components/ui/badge";
 import { ProgressCard } from "@/core/components/team-stats/ProgressCard";
-import { MatchProgressionChart } from "@/core/components/team-stats/MatchProgressionChart";
-import type { MatchProgressionMatchResult } from "@/core/components/team-stats/MatchProgressionChart";
+import { MatchProgressionChart } from "./MatchProgressionChart";
+import type { MatchProgressionMatchResult } from "./MatchProgressionChart";
 import { MatchStatsDialog } from "./MatchStatsDialog";
 import type { TeamStats } from "@/core/types/team-stats";
 import type { RateSectionDefinition, MatchBadgeDefinition } from "@/types/team-stats-display";

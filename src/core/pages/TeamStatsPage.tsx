@@ -127,14 +127,13 @@ export function TeamStatsPage(props: TeamStatsPageProps) {
         return selectedEvents;
     }, [selectedEvents]);
 
-    const selectedEventForChildren = useMemo<string>(() => {
+    const selectedEventForChildren = useMemo<string | undefined>(() => {
         if (selectedEvents.length === 1) {
             const only = selectedEvents[0];
-            return only === "all" ? "" : only || "";
+            return only === "all" ? undefined : only || undefined;
         }
 
-        const firstRealEvent = selectedEvents.find(eventCode => eventCode !== "all");
-        return firstRealEvent || "";
+        return undefined;
     }, [selectedEvents]);
 
     const getTabCategoryLabel = (tab: 'overview' | 'scoring' | 'performance') => {
@@ -574,7 +573,7 @@ export function TeamStatsPage(props: TeamStatsPageProps) {
                                 {PitDataComponent ? (
                                     <PitDataComponent
                                         teamNumber={selectedTeam}
-                                        selectedEvent={selectedEventForChildren || undefined}
+                                        selectedEvent={selectedEventForChildren}
                                     />
                                 ) : (
                                     <Card>
