@@ -460,7 +460,7 @@ export function FieldHeader({
 
             {/* No Show Confirmation Dialog */}
             <Dialog open={showNoShowDialog} onOpenChange={setShowNoShowDialog}>
-                <DialogContent className="z-150">
+                <DialogContent className="z-210">
                     <DialogHeader>
                         <DialogTitle>Confirm No Show</DialogTitle>
                         <DialogDescription>
