@@ -7,6 +7,7 @@ describe('fountainPacket compatibility', () => {
       type: 'scouting_fountain_packet',
       sessionId: 'session_123',
       packetId: 7,
+      totalPackets: 42,
       profile: 'fast',
       data: 'abcd'
     });
@@ -17,6 +18,7 @@ describe('fountainPacket compatibility', () => {
     expect(parsed?.type).toBe('scouting_fountain_packet');
     expect(parsed?.sessionId).toBe('session_123');
     expect(parsed?.packetId).toBe(7);
+    expect(parsed?.totalPackets).toBe(42);
     expect(parsed?.data).toBe('abcd');
     expect(parsed?.profile).toBe('fast');
   });
@@ -26,6 +28,7 @@ describe('fountainPacket compatibility', () => {
       type: 'scouting_fountain_packet',
       sessionId: 'legacy_session',
       packetId: 3,
+      totalPackets: 18,
       data: 'xyz',
       k: 10,
       bytes: 200,
@@ -39,6 +42,7 @@ describe('fountainPacket compatibility', () => {
     expect(parsed?.type).toBe('scouting_fountain_packet');
     expect(parsed?.sessionId).toBe('legacy_session');
     expect(parsed?.packetId).toBe(3);
+    expect(parsed?.totalPackets).toBe(18);
     expect(parsed?.data).toBe('xyz');
     expect(parsed?.indices).toEqual([1, 2]);
   });

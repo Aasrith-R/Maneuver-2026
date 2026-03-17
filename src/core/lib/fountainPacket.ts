@@ -4,6 +4,7 @@ export interface FountainPacket {
   type: string;
   sessionId: string;
   packetId: number;
+  totalPackets?: number;
   data: string;
   profile?: FountainProfile;
   k?: number;
@@ -16,6 +17,7 @@ interface CompactFountainPacket {
   t?: string;
   s?: string;
   i?: number;
+  n?: number;
   d?: string;
   p?: FountainProfile;
   v?: number;
@@ -25,6 +27,7 @@ export function buildCompactPacketJson(packet: {
   type: string;
   sessionId: string;
   packetId: number;
+  totalPackets?: number;
   data: string;
   profile: FountainProfile;
 }): string {
@@ -32,6 +35,7 @@ export function buildCompactPacketJson(packet: {
     t: packet.type,
     s: packet.sessionId,
     i: packet.packetId,
+    n: packet.totalPackets,
     p: packet.profile,
     v: 1,
     d: packet.data
@@ -42,6 +46,7 @@ export function buildLegacyPacketJson(packet: {
   type: string;
   sessionId: string;
   packetId: number;
+  totalPackets?: number;
   data: string;
   k: number;
   bytes: number;
@@ -52,6 +57,7 @@ export function buildLegacyPacketJson(packet: {
     type: packet.type,
     sessionId: packet.sessionId,
     packetId: packet.packetId,
+    totalPackets: packet.totalPackets,
     data: packet.data,
     k: packet.k,
     bytes: packet.bytes,
@@ -69,6 +75,7 @@ export function parseScannedFountainPacket(rawValue: string): FountainPacket | n
         type: parsed.t,
         sessionId: parsed.s,
         packetId: parsed.i,
+        totalPackets: parsed.n,
         data: parsed.d,
         profile: parsed.p
       };

@@ -32,6 +32,7 @@ interface FountainPacket {
   type: string;
   sessionId: string;
   packetId: number;
+  totalPackets?: number;
   data: string; // Base64 encoded binary data
   qrPayload: string;
   profile: FountainProfile;
@@ -166,7 +167,8 @@ export const UniversalFountainGenerator = ({
     const ltEncoder = createEncoder(encodedData, blockSize);
     const newSessionId = `${dataType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    const generatedPackets: FountainPacket[] = [];
+    type PacketDraft = Omit<FountainPacket, 'qrPayload' | 'totalPackets'>;
+    const packetDrafts: PacketDraft[] = [];
     let packetId = 0;
     const seenIndicesCombinations = new Set();
     let iterationCount = 0;
@@ -188,13 +190,13 @@ export const UniversalFountainGenerator = ({
 
       // Safety check to prevent infinite loops
       if (iterationCount > maxIterations) {
-        console.warn(`⚠️ Reached maximum iterations (${maxIterations}), stopping generation with ${generatedPackets.length} packets`);
-        console.warn(`Target was ${targetPackets} packets, achieved ${Math.round((generatedPackets.length / targetPackets) * 100)}%`);
+        console.warn(`⚠️ Reached maximum iterations (${maxIterations}), stopping generation with ${packetDrafts.length} packets`);
+        console.warn(`Target was ${targetPackets} packets, achieved ${Math.round((packetDrafts.length / targetPackets) * 100)}%`);
         break;
       }
 
       // Stop when we have enough packets for reliable decoding
-      if (generatedPackets.length >= targetPackets) {
+      if (packetDrafts.length >= targetPackets) {
         if (import.meta.env.DEV) {
           console.log(`✅ Generated target ${targetPackets} packets, stopping`);
         }
@@ -211,31 +213,11 @@ export const UniversalFountainGenerator = ({
         const binary = blockToBinary(block);
         const base64Data = fromUint8Array(binary);
 
-        const packetJson = fountainProfile === 'reliable'
-          ? buildLegacyPacketJson({
-            type: `${dataType}_fountain_packet`,
-            sessionId: newSessionId,
-            packetId,
-            data: base64Data,
-            k: block.k,
-            bytes: block.bytes,
-            checksum: String(block.checksum),
-            indices: block.indices
-          })
-          : buildCompactPacketJson({
-            type: `${dataType}_fountain_packet`,
-            sessionId: newSessionId,
-            packetId,
-            profile: fountainProfile,
-            data: base64Data
-          });
-
-        const packet: FountainPacket = {
+        const packetDraft: PacketDraft = {
           type: `${dataType}_fountain_packet`,
           sessionId: newSessionId,
           packetId,
           data: base64Data,
-          qrPayload: packetJson,
           profile: fountainProfile,
           k: block.k,
           bytes: block.bytes,
@@ -243,18 +225,71 @@ export const UniversalFountainGenerator = ({
           indices: block.indices
         };
 
-        // 90% of QR capacity to leave room for encoding overhead
-        if (packetJson.length > (QR_CODE_SIZE_BYTES * 0.9)) {
-          console.warn(`📦 Packet ${packetId} too large (${packetJson.length} chars), skipping`);
-          continue;
-        }
-
-        generatedPackets.push(packet);
+        packetDrafts.push(packetDraft);
         packetId++;
       } catch (error) {
         console.error(`Error generating packet ${packetId}:`, error);
         break;
       }
+    }
+
+    // Build final payloads with exact total count, then stabilize if size filtering removes any packets.
+    let candidateDrafts = packetDrafts;
+    let generatedPackets: FountainPacket[] = [];
+
+    for (let pass = 0; pass < 3; pass++) {
+      const candidateTotal = candidateDrafts.length;
+      const nextDrafts: PacketDraft[] = [];
+      const nextPackets: FountainPacket[] = [];
+
+      candidateDrafts.forEach((draft, index) => {
+        const normalizedDraft: PacketDraft = {
+          ...draft,
+          packetId: index
+        };
+
+        const packetJson = fountainProfile === 'reliable'
+          ? buildLegacyPacketJson({
+            type: normalizedDraft.type,
+            sessionId: normalizedDraft.sessionId,
+            packetId: normalizedDraft.packetId,
+            totalPackets: candidateTotal,
+            data: normalizedDraft.data,
+            k: normalizedDraft.k ?? 0,
+            bytes: normalizedDraft.bytes ?? 0,
+            checksum: normalizedDraft.checksum ?? '',
+            indices: normalizedDraft.indices ?? []
+          })
+          : buildCompactPacketJson({
+            type: normalizedDraft.type,
+            sessionId: normalizedDraft.sessionId,
+            packetId: normalizedDraft.packetId,
+            totalPackets: candidateTotal,
+            profile: normalizedDraft.profile,
+            data: normalizedDraft.data
+          });
+
+        // 90% of QR capacity to leave room for encoding overhead.
+        if (packetJson.length > (QR_CODE_SIZE_BYTES * 0.9)) {
+          console.warn(`📦 Packet ${normalizedDraft.packetId} too large (${packetJson.length} chars), skipping`);
+          return;
+        }
+
+        nextDrafts.push(normalizedDraft);
+        nextPackets.push({
+          ...normalizedDraft,
+          totalPackets: candidateTotal,
+          qrPayload: packetJson
+        });
+      });
+
+      generatedPackets = nextPackets;
+
+      if (nextDrafts.length === candidateDrafts.length) {
+        break;
+      }
+
+      candidateDrafts = nextDrafts;
     }
 
     setPackets(generatedPackets);

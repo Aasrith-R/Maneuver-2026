@@ -79,14 +79,23 @@ export const UniversalFountainScanner = ({
     if (packetIds.length === 0) return [];
 
     const missing: number[] = [];
-    const minId = packetIds[0];
     const maxId = packetIds[packetIds.length - 1];
 
-    // Ensure minId and maxId are defined
-    if (minId === undefined || maxId === undefined) return [];
+    // Ensure maxId is defined
+    if (maxId === undefined) return [];
 
-    // Check for gaps in the sequence
-    // Always start from 0 to detect missing packets at the beginning (generator is 0-indexed)
+    const knownTotal = totalPacketsRef.current;
+
+    if (typeof knownTotal === 'number' && knownTotal > 0) {
+      for (let i = 0; i < knownTotal; i++) {
+        if (!packetsRef.current.has(i)) {
+          missing.push(i);
+        }
+      }
+      return missing;
+    }
+
+    // Backward-compatible fallback when no total packet count is present.
     for (let i = 0; i <= maxId; i++) {
       if (!packetsRef.current.has(i)) {
         missing.push(i);
@@ -94,7 +103,7 @@ export const UniversalFountainScanner = ({
     }
 
     // Update total packets estimate if we have a reasonable range
-    const estimatedTotal = maxId;
+    const estimatedTotal = maxId + 1;
     if (estimatedTotal !== totalPacketsRef.current) {
       totalPacketsRef.current = estimatedTotal;
       setTotalPackets(estimatedTotal);
@@ -160,6 +169,14 @@ export const UniversalFountainScanner = ({
       const indexPreview = packet.indices ? packet.indices.join(',') : 'compact';
       addDebugMsg(`🎯 Scanned packet ${packet.packetId} with indices [${indexPreview}]`);
       addDebugMsg(`🆔 Session: ${packet.sessionId.slice(-8)}`);
+
+      if (typeof packet.totalPackets === 'number' && packet.totalPackets > 0) {
+        if (totalPacketsRef.current !== packet.totalPackets) {
+          totalPacketsRef.current = packet.totalPackets;
+          setTotalPackets(packet.totalPackets);
+          addDebugMsg(`📦 Packet stream total: ${packet.totalPackets}`);
+        }
+      }
 
       if (packet.type !== expectedPacketType) {
         addDebugMsg(`❌ Invalid QR code format - expected ${expectedPacketType}, got ${packet.type}`);
@@ -276,16 +293,25 @@ export const UniversalFountainScanner = ({
       // Update progress estimate
       const received = packetsRef.current.size;
       const packetK = typeof packet.k === 'number' ? packet.k : 0;
-      const baseEstimate = Math.max(packetK + 3, 10);
+      const announcedTotal = totalPacketsRef.current;
+      let estimatedNeeded = 0;
 
-      // Track the highest estimate we've seen using REF, avoiding state dependency
-      if (baseEstimate > neededPacketsRef.current) {
-        neededPacketsRef.current = baseEstimate;
-      } else if (neededPacketsRef.current === 0) {
-        neededPacketsRef.current = baseEstimate;
+      if (typeof announcedTotal === 'number' && announcedTotal > 0) {
+        estimatedNeeded = announcedTotal;
+      } else {
+        // Mixed-version fallback: older generators may not include totalPackets.
+        // Keep this estimate path temporarily so partially updated fleets can still transfer.
+        const baseEstimate = Math.max(packetK + 3, 10);
+
+        // Track the highest estimate we've seen using REF, avoiding state dependency
+        if (baseEstimate > neededPacketsRef.current) {
+          neededPacketsRef.current = baseEstimate;
+        } else if (neededPacketsRef.current === 0) {
+          neededPacketsRef.current = baseEstimate;
+        }
+
+        estimatedNeeded = neededPacketsRef.current;
       }
-
-      const estimatedNeeded = neededPacketsRef.current;
 
       // Calculate percentage, capping at 99% until decoder completes
       const progressPercentage = Math.min((received / estimatedNeeded) * 100, 99);
@@ -297,7 +323,10 @@ export const UniversalFountainScanner = ({
       });
 
       // Calculate and update missing packets - THROTTLED to avoid re-renders
-      if (packetK > 0 && received > packetK && progressPercentage > 90) {
+      const shouldCalculateMissing = (typeof totalPacketsRef.current === 'number' && totalPacketsRef.current > 0)
+        || (packetK > 0 && received > packetK && progressPercentage > 90);
+
+      if (shouldCalculateMissing) {
         addDebugMsg(`🔍 High packet count but no completion yet: k=${packetK}, received=${received}`);
         const missing = calculateMissingPackets();
 
@@ -347,6 +376,7 @@ export const UniversalFountainScanner = ({
     decoderRef.current = null;
     packetsRef.current.clear();
     totalPacketsRef.current = null;
+    neededPacketsRef.current = 0;
     setProgress({ received: 0, needed: 0, percentage: 0 });
     setIsComplete(false);
     setReconstructedData(null);
@@ -429,8 +459,8 @@ export const UniversalFountainScanner = ({
   }
 
   return (
-    <div className="h-screen w-full flex flex-col items-center gap-6 px-4 pt-(--header-height)">
-      <div className="flex flex-col items-center gap-4 max-w-md w-full max-h-full overflow-y-auto">
+    <div className="min-h-screen w-full flex flex-col items-center gap-6 px-4 pt-16 pb-6">
+      <div className="flex flex-col items-center gap-4 max-w-md w-full">
         {/* Navigation Header */}
         <div className="flex items-center justify-between w-full">
           <Button
@@ -549,7 +579,7 @@ export const UniversalFountainScanner = ({
                   <div className="mt-2 text-sm">
                     <div className="flex items-center gap-1 text-green-600">
                       <CheckCircle className="h-3 w-3" />
-                      <span className="text-xs">All packets in range #{1} - #{totalPackets + 1}</span>
+                      <span className="text-xs">All packets in range #{1} - #{totalPackets}</span>
                     </div>
                   </div>
                 )}
