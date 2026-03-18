@@ -19,7 +19,17 @@ import { loadPitScoutingData } from "@/core/lib/pitScoutingUtils";
 import { pitDB } from "@/core/db/database";
 import { gamificationDB } from "@/game-template/gamification/database";
 import { handleScoutingDataUpload } from "@/core/lib/uploadHandlers/scoutingDataUploadHandler";
-import { applyFilters, createDefaultFilters, type DataFilters, type ScoutingDataCollection } from "@/core/lib/dataFiltering";
+import {
+    applyFilters,
+    createDefaultFilters,
+    extractEventKeys,
+    extractScoutNames,
+    extractTeamNumbers,
+    filterPitScoutingEntries,
+    filterScoutProfilePayload,
+    type DataFilters,
+    type ScoutingDataCollection
+} from "@/core/lib/dataFiltering";
 import { useConflictResolution } from "@/core/hooks/useConflictResolution";
 import ConflictResolutionDialog from "@/core/components/data-transfer/ConflictResolutionDialog";
 import { BatchConflictDialog } from "@/core/components/data-transfer/BatchConflictDialog";
@@ -50,6 +60,8 @@ const QRDataTransferPage = () => {
     const [filters, setFilters] = useState<DataFilters>(createDefaultFilters());
     const [appliedFilters, setAppliedFilters] = useState<DataFilters>(createDefaultFilters());
     const [filterPreviewData, setFilterPreviewData] = useState<ScoutingDataCollection | null>(null);
+    const [pitFilterPreviewData, setPitFilterPreviewData] = useState<Awaited<ReturnType<typeof loadPitScoutingData>> | null>(null);
+    const [allScoutNames, setAllScoutNames] = useState<string[]>([]);
 
     // Batch review state (for scouting data conflicts)
     const [showBatchDialog, setShowBatchDialog] = useState(false);
@@ -172,6 +184,61 @@ const QRDataTransferPage = () => {
         };
     }, [dataType]);
 
+    useEffect(() => {
+        if (dataType !== 'pit-scouting') {
+            setPitFilterPreviewData(null);
+            return;
+        }
+
+        let isMounted = true;
+
+        const loadPitPreviewData = async () => {
+            try {
+                const pitData = await loadPitScoutingData();
+                if (isMounted) {
+                    setPitFilterPreviewData(pitData);
+                }
+            } catch {
+                if (isMounted) {
+                    setPitFilterPreviewData(null);
+                }
+            }
+        };
+
+        loadPitPreviewData();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [dataType]);
+
+    useEffect(() => {
+        if (dataType !== 'scout' && dataType !== 'combined') {
+            setAllScoutNames([]);
+            return;
+        }
+
+        let isMounted = true;
+
+        const loadScoutNames = async () => {
+            try {
+                const scouts = await gamificationDB.scouts.toArray();
+                if (isMounted) {
+                    setAllScoutNames(extractScoutNames(scouts));
+                }
+            } catch {
+                if (isMounted) {
+                    setAllScoutNames([]);
+                }
+            }
+        };
+
+        loadScoutNames();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [dataType]);
     const handleApplyFilters = useCallback(() => {
         setAppliedFilters(filters);
         toast.success('Filters applied to QR generation');
@@ -202,8 +269,9 @@ const QRDataTransferPage = () => {
         'pit-scouting': {
             loadData: async () => {
                 const data = await loadPitScoutingData();
+                const filteredEntries = filterPitScoutingEntries(data.entries, appliedFilters);
                 // Strip images for QR transfer to keep payload small
-                const textOnlyEntries = data.entries.map(entry => {
+                const textOnlyEntries = filteredEntries.map(entry => {
                     // eslint-disable-next-line @typescript-eslint/no-unused-vars
                     const { robotPhoto, ...rest } = entry;
                     return rest;
@@ -268,7 +336,7 @@ const QRDataTransferPage = () => {
                 const scouts = await gamificationDB.scouts.toArray();
                 const predictions = await gamificationDB.predictions.toArray();
                 const achievements = await gamificationDB.scoutAchievements.toArray();
-                return { scouts, predictions, achievements };
+                return filterScoutProfilePayload({ scouts, predictions, achievements }, appliedFilters);
             },
             saveData: async (data: unknown) => {
                 const profileData = data as { scouts?: unknown[]; predictions?: unknown[]; achievements?: unknown[] };
@@ -322,12 +390,14 @@ const QRDataTransferPage = () => {
                 const scoutingData = await exportScoutingData();
                 const scouts = await gamificationDB.scouts.toArray();
                 const predictions = await gamificationDB.predictions.toArray();
+                const achievements = await gamificationDB.scoutAchievements.toArray();
 
                 const filteredScoutingData = applyFilters(scoutingData, appliedFilters);
+                const filteredScoutProfiles = filterScoutProfilePayload({ scouts, predictions, achievements }, appliedFilters);
 
                 return {
                     entries: filteredScoutingData.entries,
-                    scoutProfiles: { scouts, predictions },
+                    scoutProfiles: filteredScoutProfiles,
                     metadata: {
                         exportedAt: new Date().toISOString(),
                         version: '3.0-maneuver-core'
@@ -337,7 +407,7 @@ const QRDataTransferPage = () => {
             saveData: async (data: unknown) => {
                 const combinedData = data as {
                     entries?: ScoutingEntryBase[];
-                    scoutProfiles?: { scouts?: unknown[]; predictions?: unknown[] };
+                    scoutProfiles?: { scouts?: unknown[]; predictions?: unknown[]; achievements?: unknown[] };
                 };
 
                 // Handle scouting entries with conflict detection
@@ -382,6 +452,16 @@ const QRDataTransferPage = () => {
                     }
                     console.log(`Imported ${predictionCount} combined predictions from QR`);
                 }
+                if (combinedData.scoutProfiles?.achievements) {
+                    let achievementCount = 0;
+                    for (const achievement of combinedData.scoutProfiles.achievements) {
+                        const normalizedAchievement = normalizeTransferredScoutAchievement(achievement);
+                        if (!normalizedAchievement) continue;
+                        await gamificationDB.scoutAchievements.put(normalizedAchievement as never);
+                        achievementCount += 1;
+                    }
+                    console.log(`Imported ${achievementCount} combined achievements from QR`);
+                }
             },
             validateData: (data: unknown): boolean => {
                 const combinedData = data as { entries?: unknown[] };
@@ -390,7 +470,7 @@ const QRDataTransferPage = () => {
             getDataSummary: (data: unknown) => {
                 const combinedData = data as {
                     entries?: unknown[];
-                    scoutProfiles?: { scouts?: unknown[]; predictions?: unknown[] };
+                    scoutProfiles?: { scouts?: unknown[]; predictions?: unknown[]; achievements?: unknown[] };
                 };
                 const entryCount = combinedData.entries?.length || 0;
                 const scoutCount = combinedData.scoutProfiles?.scouts?.length || 0;
@@ -405,6 +485,13 @@ const QRDataTransferPage = () => {
     };
 
     const config = dataTypeConfigs[dataType];
+    const supportsFilters = dataType === 'scouting' || dataType === 'combined' || dataType === 'pit-scouting' || dataType === 'scout';
+    const pitFilterSummary = pitFilterPreviewData
+        ? `Available data: ${filterPitScoutingEntries(pitFilterPreviewData.entries, filters).length} pit entries`
+        : undefined;
+    const scoutFilterSummary = dataType === 'scout' || dataType === 'combined'
+        ? `Available data: ${filters.scouts.includeAll ? allScoutNames.length : filters.scouts.selectedScouts.length} ${(filters.scouts.includeAll ? allScoutNames.length : filters.scouts.selectedScouts.length) === 1 ? 'scout' : 'scouts'}`
+        : undefined;
 
     // Memoize loadData to prevent unnecessary re-renders
     const loadData = useCallback(() => config.loadData(), [config]);
@@ -423,7 +510,7 @@ const QRDataTransferPage = () => {
                 description={config.description}
                 noDataMessage={config.noDataMessage}
                 settingsContent={
-                    (dataType === 'scouting' || dataType === 'combined') ? (
+                    supportsFilters ? (
                         <div className="space-y-3">
                             <div>
                                 <p className="text-sm font-medium">Filter Data for Generation (Optional)</p>
@@ -432,10 +519,22 @@ const QRDataTransferPage = () => {
                                 </p>
                             </div>
                             <DataFilteringControls
-                                data={filterPreviewData || undefined}
+                                data={(dataType === 'scouting' || dataType === 'combined') ? filterPreviewData || undefined : undefined}
                                 filters={filters}
                                 onFiltersChange={setFilters}
                                 onApplyFilters={handleApplyFilters}
+                                showMatchRange={dataType === 'scouting' || dataType === 'combined'}
+                                showEventFilter={dataType !== 'scout'}
+                                showTeamFilter={dataType === 'scouting' || dataType === 'combined' || dataType === 'pit-scouting'}
+                                showScoutFilter={dataType === 'scout' || dataType === 'combined'}
+                                availableEvents={dataType === 'pit-scouting' && pitFilterPreviewData
+                                    ? extractEventKeys({ entries: pitFilterPreviewData.entries as never[], exportedAt: Date.now(), version: '1.0' })
+                                    : undefined}
+                                availableTeams={dataType === 'pit-scouting' && pitFilterPreviewData
+                                    ? extractTeamNumbers({ entries: pitFilterPreviewData.entries as never[], exportedAt: Date.now(), version: '1.0' })
+                                    : undefined}
+                                availableScouts={dataType === 'scout' || dataType === 'combined' ? allScoutNames : undefined}
+                                summaryOverride={dataType === 'pit-scouting' ? pitFilterSummary : dataType === 'scout' ? scoutFilterSummary : undefined}
                             />
                         </div>
                     ) : undefined

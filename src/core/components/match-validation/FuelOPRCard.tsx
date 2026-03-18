@@ -13,9 +13,12 @@ import {
 export interface FuelOPRDisplayRow {
   teamNumber: number;
   matchesPlayed: number;
-  autoFuelOPR: number;
-  teleopFuelOPR: number;
-  totalFuelOPR: number;
+  autoFuelOPRFixed: number;
+  teleopFuelOPRFixed: number;
+  totalFuelOPRFixed: number;
+  autoFuelOPRAdaptive: number;
+  teleopFuelOPRAdaptive: number;
+  totalFuelOPRAdaptive: number;
   scaledAutoAvg: number;
   scaledTeleopAvg: number;
   scaledTotalAvg: number;
@@ -33,8 +36,9 @@ export type FuelOPRDisplayMode = 'impact' | 'production';
 interface FuelOPRCardProps {
   impactRows: FuelOPRDisplayRow[];
   productionRows: FuelOPRDisplayRow[];
-  impactLambda: number | null;
-  productionLambda: number | null;
+  fixedLambda: number;
+  impactAdaptiveLambda: number | null;
+  productionAdaptiveLambda: number | null;
   mode: FuelOPRDisplayMode;
   onModeChange: (mode: FuelOPRDisplayMode) => void;
   isLoading: boolean;
@@ -50,14 +54,15 @@ const toCsvValue = (value: string | number): string => {
 export const FuelOPRCard: React.FC<FuelOPRCardProps> = ({
   impactRows,
   productionRows,
-  impactLambda,
-  productionLambda,
+  fixedLambda,
+  impactAdaptiveLambda,
+  productionAdaptiveLambda,
   mode,
   onModeChange,
   isLoading,
 }) => {
   const rows = mode === 'production' ? productionRows : impactRows;
-  const lambda = mode === 'production' ? productionLambda : impactLambda;
+  const adaptiveLambda = mode === 'production' ? productionAdaptiveLambda : impactAdaptiveLambda;
 
   const handleExportCsv = () => {
     if (rows.length === 0) return;
@@ -65,9 +70,12 @@ export const FuelOPRCard: React.FC<FuelOPRCardProps> = ({
     const headers = [
       'Team',
       'Matches',
-      'Auto OPR',
-      'Teleop OPR',
-      'Total OPR',
+      'Auto OPR (lambda 0.3)',
+      'Teleop OPR (lambda 0.3)',
+      'Total OPR (lambda 0.3)',
+      'Auto OPR (adaptive)',
+      'Teleop OPR (adaptive)',
+      'Total OPR (adaptive)',
       'Scaled Auto Avg',
       'Scaled Teleop Avg',
       'Scaled Total Avg',
@@ -83,9 +91,12 @@ export const FuelOPRCard: React.FC<FuelOPRCardProps> = ({
     const csvRows = rows.map((row) => [
       row.teamNumber,
       row.matchesPlayed,
-      formatValue(row.autoFuelOPR),
-      formatValue(row.teleopFuelOPR),
-      formatValue(row.totalFuelOPR),
+      formatValue(row.autoFuelOPRFixed),
+      formatValue(row.teleopFuelOPRFixed),
+      formatValue(row.totalFuelOPRFixed),
+      formatValue(row.autoFuelOPRAdaptive),
+      formatValue(row.teleopFuelOPRAdaptive),
+      formatValue(row.totalFuelOPRAdaptive),
       formatValue(row.scaledAutoAvg),
       formatValue(row.scaledTeleopAvg),
       formatValue(row.scaledTotalAvg),
@@ -123,8 +134,9 @@ export const FuelOPRCard: React.FC<FuelOPRCardProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex flex-wrap items-center gap-2">
             <span>Fuel OPR & Scaled Fuel ({mode === 'production' ? 'Production' : 'Impact'})</span>
-            {lambda !== null && (
-              <span className="text-xs font-normal text-muted-foreground">Ridge λ={lambda}</span>
+            <span className="text-xs font-normal text-muted-foreground">Fixed λ={fixedLambda}</span>
+            {adaptiveLambda !== null && (
+              <span className="text-xs font-normal text-muted-foreground">Adaptive λ={adaptiveLambda.toFixed(3)}</span>
             )}
           </CardTitle>
           <div className="flex flex-wrap items-center gap-2">
@@ -172,9 +184,12 @@ export const FuelOPRCard: React.FC<FuelOPRCardProps> = ({
                 <TableRow>
                   <TableHead>Team</TableHead>
                   <TableHead>Matches</TableHead>
-                  <TableHead>Auto OPR</TableHead>
-                  <TableHead>Teleop OPR</TableHead>
-                  <TableHead>Total OPR</TableHead>
+                  <TableHead>Auto OPR (0.3)</TableHead>
+                  <TableHead>Teleop OPR (0.3)</TableHead>
+                  <TableHead>Total OPR (0.3)</TableHead>
+                  <TableHead>Auto OPR (Adaptive)</TableHead>
+                  <TableHead>Teleop OPR (Adaptive)</TableHead>
+                  <TableHead>Total OPR (Adaptive)</TableHead>
                   <TableHead>Scaled Auto Avg</TableHead>
                   <TableHead>Scaled Teleop Avg</TableHead>
                   <TableHead>Scaled Total Avg</TableHead>
@@ -190,9 +205,12 @@ export const FuelOPRCard: React.FC<FuelOPRCardProps> = ({
                   <TableRow key={row.teamNumber}>
                     <TableCell className="font-medium">{row.teamNumber}</TableCell>
                     <TableCell>{row.matchesPlayed}</TableCell>
-                    <TableCell>{formatValue(row.autoFuelOPR)}</TableCell>
-                    <TableCell>{formatValue(row.teleopFuelOPR)}</TableCell>
-                    <TableCell>{formatValue(row.totalFuelOPR)}</TableCell>
+                    <TableCell>{formatValue(row.autoFuelOPRFixed)}</TableCell>
+                    <TableCell>{formatValue(row.teleopFuelOPRFixed)}</TableCell>
+                    <TableCell>{formatValue(row.totalFuelOPRFixed)}</TableCell>
+                    <TableCell>{formatValue(row.autoFuelOPRAdaptive)}</TableCell>
+                    <TableCell>{formatValue(row.teleopFuelOPRAdaptive)}</TableCell>
+                    <TableCell>{formatValue(row.totalFuelOPRAdaptive)}</TableCell>
                     <TableCell>{formatValue(row.scaledAutoAvg)}</TableCell>
                     <TableCell>{formatValue(row.scaledTeleopAvg)}</TableCell>
                     <TableCell>{formatValue(row.scaledTotalAvg)}</TableCell>

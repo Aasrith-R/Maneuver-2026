@@ -21,7 +21,7 @@ import { DEFAULT_VALIDATION_CONFIG } from '@/core/lib/matchValidationTypes';
 import { formatMatchLabel } from '@/core/lib/matchValidationUtils';
 import { getCachedTBAEventMatches } from '@/core/lib/tbaCache';
 import { getEntriesByEvent } from '@/core/db/scoutingDatabase';
-import { calculateFuelOPRHybrid } from '@/game-template/fuelOpr';
+import { calculateFuelOPR, calculateFuelOPRHybrid } from '@/game-template/fuelOpr';
 import { processPredictionRewardsForMatches } from '@/core/lib/predictionRewards';
 import {
   correctClimbDataWithValidation,
@@ -31,6 +31,7 @@ import {
 
 const VALIDATION_CONFIG_KEY = 'validationConfig';
 const FUEL_OPR_INCLUDE_PLAYOFFS_KEY = 'fuelOprIncludePlayoffs';
+const FIXED_FUEL_OPR_LAMBDA = 0.3;
 
 const GAME_VALIDATION_DEFAULT_CONFIG: ValidationConfig = {
   ...DEFAULT_VALIDATION_CONFIG,
@@ -50,8 +51,8 @@ export const MatchValidationPage: React.FC = () => {
   const [demoAutoValidated, setDemoAutoValidated] = useState(false);
   const [impactFuelOprRows, setImpactFuelOprRows] = useState<FuelOPRDisplayRow[]>([]);
   const [productionFuelOprRows, setProductionFuelOprRows] = useState<FuelOPRDisplayRow[]>([]);
-  const [impactFuelOprLambda, setImpactFuelOprLambda] = useState<number | null>(null);
-  const [productionFuelOprLambda, setProductionFuelOprLambda] = useState<number | null>(null);
+  const [impactAdaptiveFuelOprLambda, setImpactAdaptiveFuelOprLambda] = useState<number | null>(null);
+  const [productionAdaptiveFuelOprLambda, setProductionAdaptiveFuelOprLambda] = useState<number | null>(null);
   const [fuelOprMode, setFuelOprMode] = useState<FuelOPRDisplayMode>('impact');
   const [fuelOprLoading, setFuelOprLoading] = useState(false);
   const [fuelOprIncludePlayoffs, setFuelOprIncludePlayoffs] = useState(true);
@@ -142,8 +143,8 @@ export const MatchValidationPage: React.FC = () => {
     if (!eventKey) {
       setImpactFuelOprRows([]);
       setProductionFuelOprRows([]);
-      setImpactFuelOprLambda(null);
-      setProductionFuelOprLambda(null);
+      setImpactAdaptiveFuelOprLambda(null);
+      setProductionAdaptiveFuelOprLambda(null);
       return;
     }
 
@@ -178,6 +179,18 @@ export const MatchValidationPage: React.FC = () => {
 
         if (cancelled) return;
 
+        const impactOpr = calculateFuelOPR(cachedMatches, {
+          ridgeLambda: FIXED_FUEL_OPR_LAMBDA,
+          includePlayoffs: fuelOprIncludePlayoffs,
+          nonNegative: false,
+        });
+
+        const productionOpr = calculateFuelOPR(cachedMatches, {
+          ridgeLambda: FIXED_FUEL_OPR_LAMBDA,
+          includePlayoffs: fuelOprIncludePlayoffs,
+          nonNegative: true,
+        });
+
         const impactHybrid = calculateFuelOPRHybrid(cachedMatches, {
           includePlayoffs: fuelOprIncludePlayoffs,
           nonNegative: false,
@@ -188,23 +201,11 @@ export const MatchValidationPage: React.FC = () => {
           nonNegative: true,
         });
 
-        const impactOpr = impactHybrid.opr;
-        const productionOpr = productionHybrid.opr;
-
         if (import.meta.env.DEV && eventKey.startsWith('demo')) {
-          console.log(`[Fuel OPR] Impact lambda for ${eventKey}: ${impactHybrid.selectedLambda.toFixed(3)} (${impactHybrid.mode})`);
-          console.log(`[Fuel OPR] Production lambda for ${eventKey}: ${productionHybrid.selectedLambda.toFixed(3)} (${productionHybrid.mode})`);
-
-          const latestSweep = impactHybrid.latestSweep;
-          if (latestSweep && latestSweep.rows.length > 0) {
-            console.log(`[Fuel OPR] Impact sweep (train ${latestSweep.trainMatchCount}, holdout ${latestSweep.holdoutMatchCount})`);
-            console.table(
-              latestSweep.rows.map(row => ({
-                lambda: row.lambda,
-                holdoutRmse: Math.round(row.holdoutRmse * 100) / 100,
-              }))
-            );
-          }
+          console.log(`[Fuel OPR] Impact lambda for ${eventKey}: ${FIXED_FUEL_OPR_LAMBDA.toFixed(3)} (fixed)`);
+          console.log(`[Fuel OPR] Production lambda for ${eventKey}: ${FIXED_FUEL_OPR_LAMBDA.toFixed(3)} (fixed)`);
+          console.log(`[Fuel OPR] Impact adaptive lambda for ${eventKey}: ${impactHybrid.selectedLambda.toFixed(3)} (${impactHybrid.mode})`);
+          console.log(`[Fuel OPR] Production adaptive lambda for ${eventKey}: ${productionHybrid.selectedLambda.toFixed(3)} (${productionHybrid.mode})`);
         }
 
         const scaledByTeam = new Map<number, {
@@ -383,8 +384,12 @@ export const MatchValidationPage: React.FC = () => {
           }
         }
 
-        const buildRows = (oprRows: typeof impactOpr.teams): FuelOPRDisplayRow[] => {
-          const oprByTeam = new Map(oprRows.map(team => [team.teamNumber, team]));
+        const buildRows = (
+          fixedOprRows: typeof impactOpr.teams,
+          adaptiveOprRows: typeof impactHybrid.opr.teams
+        ): FuelOPRDisplayRow[] => {
+          const fixedOprByTeam = new Map(fixedOprRows.map(team => [team.teamNumber, team]));
+          const adaptiveOprByTeam = new Map(adaptiveOprRows.map(team => [team.teamNumber, team]));
 
           const defenseByTeam = new Map<number, { suppressionSum: number; samples: number }>();
           const eligibleMatches = cachedMatches.filter(match => fuelOprIncludePlayoffs || match.comp_level === 'qm');
@@ -411,7 +416,7 @@ export const MatchValidationPage: React.FC = () => {
               const observedOpponentFuel = getObservedTotal(match, opponentAlliance);
 
               const expectedOpponentFuel = opponentTeams.reduce((sum, teamNumber) => {
-                return sum + (oprByTeam.get(teamNumber)?.totalFuelOPR ?? 0);
+                return sum + (fixedOprByTeam.get(teamNumber)?.totalFuelOPR ?? 0);
               }, 0);
 
               const suppression = expectedOpponentFuel - observedOpponentFuel;
@@ -427,7 +432,8 @@ export const MatchValidationPage: React.FC = () => {
           }
 
           const allTeamNumbers = new Set<number>([
-            ...oprByTeam.keys(),
+            ...fixedOprByTeam.keys(),
+            ...adaptiveOprByTeam.keys(),
             ...scaledByTeam.keys(),
             ...passingByTeam.keys(),
             ...defenseByTeam.keys(),
@@ -435,16 +441,21 @@ export const MatchValidationPage: React.FC = () => {
 
           return [...allTeamNumbers]
             .map(teamNumber => {
-              const oprTeam = oprByTeam.get(teamNumber);
+              const fixedOprTeam = fixedOprByTeam.get(teamNumber);
+              const adaptiveOprTeam = adaptiveOprByTeam.get(teamNumber);
               const scaledTeam = scaledByTeam.get(teamNumber);
-              const matchesPlayed = Math.max(oprTeam?.matchesPlayed ?? 0, scaledTeam?.matches ?? 0);
+              const matchesPlayed = Math.max(
+                fixedOprTeam?.matchesPlayed ?? 0,
+                adaptiveOprTeam?.matchesPlayed ?? 0,
+                scaledTeam?.matches ?? 0
+              );
 
               const fuelDataMatches = scaledTeam?.fuelDataMatches ?? 0;
               const hasScaledFuelData = fuelDataMatches > 0;
               const scaledAutoAvg = hasScaledFuelData ? (scaledTeam?.autoSum ?? 0) / fuelDataMatches : 0;
               const scaledTeleopAvg = hasScaledFuelData ? (scaledTeam?.teleopSum ?? 0) / fuelDataMatches : 0;
               const scaledTotalAvg = scaledAutoAvg + scaledTeleopAvg;
-              const totalFuelOPR = oprTeam?.totalFuelOPR ?? 0;
+              const totalFuelOPRFixed = fixedOprTeam?.totalFuelOPR ?? 0;
               const passingAggregate = passingByTeam.get(teamNumber);
               const hasPassingData = (passingAggregate?.passDataMatches ?? 0) > 0;
               const passingAvg = hasPassingData
@@ -466,8 +477,8 @@ export const MatchValidationPage: React.FC = () => {
               const targetMatches = 6;
               const matchPenalty = Math.max(0, (targetMatches - matchesPlayed) / targetMatches);
 
-              const gap = Math.abs(totalFuelOPR - scaledTotalAvg);
-              const scaleBase = Math.max(1, Math.abs(totalFuelOPR), Math.abs(scaledTotalAvg));
+              const gap = Math.abs(totalFuelOPRFixed - scaledTotalAvg);
+              const scaleBase = Math.max(1, Math.abs(totalFuelOPRFixed), Math.abs(scaledTotalAvg));
               const gapPenalty = hasScaledFuelData
                 ? Math.max(0, Math.min(1, gap / scaleBase))
                 : 0;
@@ -483,8 +494,8 @@ export const MatchValidationPage: React.FC = () => {
 
               const confidenceScore = 1 - confidencePenalty;
               const hybridBase = hasScaledFuelData
-                ? 0.6 * scaledTotalAvg + 0.4 * totalFuelOPR
-                : totalFuelOPR;
+                ? 0.6 * scaledTotalAvg + 0.4 * totalFuelOPRFixed
+                : totalFuelOPRFixed;
               const hybridScorerIndex = hybridBase * confidenceScore;
               const assistComponent = hasPassingData ? assistImpact * 0.2 : 0;
               const defenseComponent = defenseImpact * 0.2;
@@ -493,9 +504,12 @@ export const MatchValidationPage: React.FC = () => {
               return {
                 teamNumber,
                 matchesPlayed,
-                autoFuelOPR: oprTeam?.autoFuelOPR ?? 0,
-                teleopFuelOPR: oprTeam?.teleopFuelOPR ?? 0,
-                totalFuelOPR,
+                autoFuelOPRFixed: fixedOprTeam?.autoFuelOPR ?? 0,
+                teleopFuelOPRFixed: fixedOprTeam?.teleopFuelOPR ?? 0,
+                totalFuelOPRFixed,
+                autoFuelOPRAdaptive: adaptiveOprTeam?.autoFuelOPR ?? 0,
+                teleopFuelOPRAdaptive: adaptiveOprTeam?.teleopFuelOPR ?? 0,
+                totalFuelOPRAdaptive: adaptiveOprTeam?.totalFuelOPR ?? 0,
                 scaledAutoAvg,
                 scaledTeleopAvg,
                 scaledTotalAvg,
@@ -511,22 +525,22 @@ export const MatchValidationPage: React.FC = () => {
             .sort((a, b) => b.totalContributionIndex - a.totalContributionIndex || b.hybridScorerIndex - a.hybridScorerIndex || a.teamNumber - b.teamNumber);
         };
 
-        const impactRows = buildRows(impactOpr.teams);
-        const productionRows = buildRows(productionOpr.teams);
+        const impactRows = buildRows(impactOpr.teams, impactHybrid.opr.teams);
+        const productionRows = buildRows(productionOpr.teams, productionHybrid.opr.teams);
 
         if (!cancelled) {
           setImpactFuelOprRows(impactRows);
           setProductionFuelOprRows(productionRows);
-          setImpactFuelOprLambda(impactHybrid.selectedLambda);
-          setProductionFuelOprLambda(productionHybrid.selectedLambda);
+          setImpactAdaptiveFuelOprLambda(impactHybrid.selectedLambda);
+          setProductionAdaptiveFuelOprLambda(productionHybrid.selectedLambda);
         }
       } catch (error) {
         console.error('Failed to load Fuel OPR data:', error);
         if (!cancelled) {
           setImpactFuelOprRows([]);
           setProductionFuelOprRows([]);
-          setImpactFuelOprLambda(null);
-          setProductionFuelOprLambda(null);
+          setImpactAdaptiveFuelOprLambda(null);
+          setProductionAdaptiveFuelOprLambda(null);
         }
       } finally {
         if (!cancelled) {
@@ -791,8 +805,9 @@ export const MatchValidationPage: React.FC = () => {
           <FuelOPRCard
             impactRows={impactFuelOprRows}
             productionRows={productionFuelOprRows}
-            impactLambda={impactFuelOprLambda}
-            productionLambda={productionFuelOprLambda}
+            fixedLambda={FIXED_FUEL_OPR_LAMBDA}
+            impactAdaptiveLambda={impactAdaptiveFuelOprLambda}
+            productionAdaptiveLambda={productionAdaptiveFuelOprLambda}
             mode={fuelOprMode}
             onModeChange={setFuelOprMode}
             isLoading={fuelOprLoading}
