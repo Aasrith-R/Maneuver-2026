@@ -147,6 +147,21 @@ export function TeamStatsDialog({
                                     statSections={overviewStatSections}
                                     rateSections={overviewRateSections}
                                 />
+                            </TabsContent>
+
+                            <TabsContent value="scoring" className="space-y-4 h-full mt-0">
+                                <ConfiguredStatsSections
+                                    teamStats={teamStats}
+                                    statSections={scoringStatSections}
+                                    emptyMessage="No detailed stats available for scoring."
+                                />
+                            </TabsContent>
+
+                            <TabsContent value="performance" className="space-y-4 h-full mt-0">
+                                <DefenseAgainstTeamAnalysis
+                                    teamNumber={String(teamNumber)}
+                                    selectedEvent={teamStats.eventKey}
+                                />
                                 <Card>
                                     <CardHeader className="pb-3">
                                         <CardTitle className="text-base">Scout Comments</CardTitle>
@@ -174,21 +189,6 @@ export function TeamStatsDialog({
                                         )}
                                     </CardContent>
                                 </Card>
-                            </TabsContent>
-
-                            <TabsContent value="scoring" className="space-y-4 h-full mt-0">
-                                <ConfiguredStatsSections
-                                    teamStats={teamStats}
-                                    statSections={scoringStatSections}
-                                    emptyMessage="No detailed stats available for scoring."
-                                />
-                            </TabsContent>
-
-                            <TabsContent value="performance" className="space-y-4 h-full mt-0">
-                                <DefenseAgainstTeamAnalysis
-                                    teamNumber={String(teamNumber)}
-                                    selectedEvent={teamStats.eventKey}
-                                />
                                 <ConfiguredStatsSections
                                     teamStats={teamStats}
                                     rateSections={performanceRateSections}
