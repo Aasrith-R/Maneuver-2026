@@ -42,6 +42,9 @@ interface DesktopPickListLayoutProps {
     onAddTeamToAlliance?: (teamNumber: number, allianceId: number) => void;
     onUpdateAlliances: (alliances: Alliance[]) => void;
     onUpdateBackups: (backups: BackupTeam[]) => void;
+    onHasTeamPickListSnapshot: (teamNumber: number) => boolean;
+    onRestoreTeamToPickLists: (teamNumber: number) => void;
+    onDiscardTeamPickListSnapshot: (teamNumber: number) => void;
     onNameChange: (name: string) => void;
     onDescriptionChange: (description: string) => void;
     onCreateList: () => void;
@@ -78,6 +81,9 @@ export const DesktopPickListLayout = ({
     onAddTeamToAlliance,
     onUpdateAlliances,
     onUpdateBackups,
+    onHasTeamPickListSnapshot,
+    onRestoreTeamToPickLists,
+    onDiscardTeamPickListSnapshot,
     onNameChange,
     onDescriptionChange,
     onCreateList,
@@ -100,13 +106,13 @@ export const DesktopPickListLayout = ({
                     activeFilterIds={activeFilterIds}
                     defenseTargetTeamFilter={defenseTargetTeamFilter}
                     hideAllianceAssignedTeams={hideAllianceAssignedTeams}
+                    eventFilter={eventFilter}
+                    availableEventKeys={availableEventKeys}
                     onSearchChange={onSearchChange}
                     onSortChange={onSortChange}
                     onFilterChange={onFilterChange}
                     onDefenseTargetTeamFilterChange={onDefenseTargetTeamFilterChange}
                     onToggleHideAllianceAssignedTeams={onToggleHideAllianceAssignedTeams}
-                    eventFilter={eventFilter}
-                    availableEventKeys={availableEventKeys}
                     onEventFilterChange={onEventFilterChange}
                     onAddTeamToList={onAddTeamToList}
                     onAddTeamToAlliance={onAddTeamToAlliance}
@@ -123,6 +129,9 @@ export const DesktopPickListLayout = ({
                             availableTeams={availableTeams}
                             onUpdateAlliances={onUpdateAlliances}
                             onUpdateBackups={onUpdateBackups}
+                            onHasTeamPickListSnapshot={onHasTeamPickListSnapshot}
+                            onRestoreTeamToPickLists={onRestoreTeamToPickLists}
+                            onDiscardTeamPickListSnapshot={onDiscardTeamPickListSnapshot}
                         />
                     )}
 

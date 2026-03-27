@@ -52,6 +52,9 @@ const PickListPage = () => {
         importPickLists,
         addTeamToAlliance,
         assignToAllianceAndRemove,
+        hasTeamPickListSnapshot,
+        restoreTeamToPickLists,
+        discardTeamPickListSnapshot,
         handleToggleAllianceSelection,
     } = usePickList();
 
@@ -96,10 +99,14 @@ const PickListPage = () => {
                     onFilterChange={setActiveFilterIds}
                     onDefenseTargetTeamFilterChange={setDefenseTargetTeamFilter}
                     onEventFilterChange={setEventFilter}
+                    onToggleHideAllianceAssignedTeams={setHideAllianceAssignedTeams}
                     onAddTeamToList={addTeamToList}
                     onAddTeamToAlliance={showAllianceSelection ? addTeamToAlliance : undefined}
                     onUpdateAlliances={setAlliances}
                     onUpdateBackups={setBackups}
+                    onHasTeamPickListSnapshot={hasTeamPickListSnapshot}
+                    onRestoreTeamToPickLists={restoreTeamToPickLists}
+                    onDiscardTeamPickListSnapshot={discardTeamPickListSnapshot}
                     onNameChange={setNewListName}
                     onDescriptionChange={setNewListDescription}
                     onCreateList={createNewList}
@@ -110,7 +117,6 @@ const PickListPage = () => {
                     onExport={exportPickLists}
                     onImport={importPickLists}
                     onToggleAllianceSelection={handleToggleAllianceSelection}
-                    onToggleHideAllianceAssignedTeams={setHideAllianceAssignedTeams}
                 />
 
                 {/* Desktop Layout (xl and above) - Side by Side */}
@@ -129,18 +135,21 @@ const PickListPage = () => {
                     activeFilterIds={activeFilterIds}
                     defenseTargetTeamFilter={defenseTargetTeamFilter}
                     hideAllianceAssignedTeams={hideAllianceAssignedTeams}
+                    eventFilter={eventFilter}
+                    availableEventKeys={availableEventKeys}
                     onSearchChange={setSearchFilter}
                     onSortChange={setSortBy}
                     onFilterChange={setActiveFilterIds}
                     onDefenseTargetTeamFilterChange={setDefenseTargetTeamFilter}
                     onToggleHideAllianceAssignedTeams={setHideAllianceAssignedTeams}
-                    eventFilter={eventFilter}
-                    availableEventKeys={availableEventKeys}
                     onEventFilterChange={setEventFilter}
                     onAddTeamToList={addTeamToList}
                     onAddTeamToAlliance={showAllianceSelection ? addTeamToAlliance : undefined}
                     onUpdateAlliances={setAlliances}
                     onUpdateBackups={setBackups}
+                    onHasTeamPickListSnapshot={hasTeamPickListSnapshot}
+                    onRestoreTeamToPickLists={restoreTeamToPickLists}
+                    onDiscardTeamPickListSnapshot={discardTeamPickListSnapshot}
                     onNameChange={setNewListName}
                     onDescriptionChange={setNewListDescription}
                     onCreateList={createNewList}
