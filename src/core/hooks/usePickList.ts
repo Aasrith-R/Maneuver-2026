@@ -35,7 +35,8 @@ import type { TeamStats } from "@/core/types/team-stats";
 export interface UsePickListResult {
     // Data
     availableTeams: TeamStats[];
-    eventFilteredTeamCount: number;
+    teamLookupTeams: TeamStats[];
+    pickListEventTeamCount: number;
     filteredAndSortedTeams: TeamStats[];
     pickLists: PickList[];
     alliances: Alliance[];
@@ -49,7 +50,7 @@ export interface UsePickListResult {
     sortBy: PickListSortOption;
     activeFilterIds: string[];
     defenseTargetTeamFilter: string;
-    eventFilter: string;
+    pickListEvent: string;
     availableEventKeys: string[];
     activeTab: string;
     showAllianceSelection: boolean;
@@ -62,7 +63,7 @@ export interface UsePickListResult {
     setSortBy: (sort: PickListSortOption) => void;
     setActiveFilterIds: (filters: string[]) => void;
     setDefenseTargetTeamFilter: (teamNumber: string) => void;
-    setEventFilter: (eventKey: string) => void;
+    setPickListEvent: (eventKey: string) => void;
     setActiveTab: (tab: string) => void;
     setAlliances: (alliances: Alliance[]) => void;
     setBackups: (backups: BackupTeam[]) => void;
@@ -84,6 +85,8 @@ export interface UsePickListResult {
 }
 
 const TEAM_MEMBERSHIP_SNAPSHOTS_STORAGE_KEY = "pickListTeamMembershipSnapshots";
+const PICK_LIST_EVENT_STORAGE_KEY = "pickListEventKey";
+const LEGACY_PICK_LIST_EVENT_STORAGE_KEY = "pickListEventFilter";
 
 const clonePickListItem = (item: PickListItem): PickListItem => ({
     ...item,
@@ -152,9 +155,59 @@ const restoreTeamInLists = (
     });
 };
 
+const pickPreferredTeamStats = (
+    current: TeamStats,
+    candidate: TeamStats,
+    preferredEventKey?: string
+): TeamStats => {
+    const normalizedPreferredEventKey = preferredEventKey?.trim().toLowerCase();
+    const currentMatchesPreferredEvent = normalizedPreferredEventKey
+        ? current.eventKey?.trim().toLowerCase() === normalizedPreferredEventKey
+        : false;
+    const candidateMatchesPreferredEvent = normalizedPreferredEventKey
+        ? candidate.eventKey?.trim().toLowerCase() === normalizedPreferredEventKey
+        : false;
+
+    if (candidateMatchesPreferredEvent && !currentMatchesPreferredEvent) {
+        return candidate;
+    }
+
+    if (currentMatchesPreferredEvent && !candidateMatchesPreferredEvent) {
+        return current;
+    }
+
+    if (candidate.matchCount !== current.matchCount) {
+        return candidate.matchCount > current.matchCount ? candidate : current;
+    }
+
+    const currentEventKey = current.eventKey ?? "";
+    const candidateEventKey = candidate.eventKey ?? "";
+    return candidateEventKey.localeCompare(currentEventKey) > 0 ? candidate : current;
+};
+
+const dedupeTeamsByNumber = (teams: TeamStats[], preferredEventKey?: string): TeamStats[] => {
+    const teamsByNumber = new Map<number, TeamStats>();
+
+    teams.forEach((team) => {
+        const existing = teamsByNumber.get(team.teamNumber);
+        if (!existing) {
+            teamsByNumber.set(team.teamNumber, team);
+            return;
+        }
+
+        teamsByNumber.set(
+            team.teamNumber,
+            pickPreferredTeamStats(existing, team, preferredEventKey)
+        );
+    });
+
+    return Array.from(teamsByNumber.values()).sort((a, b) => a.teamNumber - b.teamNumber);
+};
+
 export const usePickList = (eventKey?: string): UsePickListResult => {
     // Get team stats from centralized hook
     const { teamStats, isLoading } = useAllTeamStats(eventKey);
+    const normalizedEventKey = eventKey?.trim();
 
     // State
     const [pickLists, setPickLists] = useState<PickList[]>([]);
@@ -166,7 +219,7 @@ export const usePickList = (eventKey?: string): UsePickListResult => {
     const [sortBy, setSortBy] = useState<PickListSortOption>("teamNumber");
     const [activeFilterIds, setActiveFilterIds] = useState<string[]>([]);
     const [defenseTargetTeamFilter, setDefenseTargetTeamFilter] = useState("");
-    const [eventFilter, setEventFilter] = useState("all");
+    const [pickListEvent, setPickListEvent] = useState("");
     const [activeTab, setActiveTab] = useState("teams");
     const [showAllianceSelection, setShowAllianceSelection] = useState(true);
     const [hideAllianceAssignedTeams, setHideAllianceAssignedTeams] = useState(true);
@@ -249,16 +302,18 @@ export const usePickList = (eventKey?: string): UsePickListResult => {
 
     // Load event filter preference from localStorage
     useEffect(() => {
-        const savedEventFilter = localStorage.getItem("pickListEventFilter");
-        if (savedEventFilter && savedEventFilter.trim()) {
-            setEventFilter(savedEventFilter);
+        const savedPickListEvent = localStorage.getItem(PICK_LIST_EVENT_STORAGE_KEY)
+            ?? localStorage.getItem(LEGACY_PICK_LIST_EVENT_STORAGE_KEY);
+        if (savedPickListEvent && savedPickListEvent.trim() && savedPickListEvent !== "all") {
+            setPickListEvent(savedPickListEvent);
         }
     }, []);
 
-    // Save event filter preference to localStorage
+    // Save pick list event preference to localStorage
     useEffect(() => {
-        localStorage.setItem("pickListEventFilter", eventFilter);
-    }, [eventFilter]);
+        localStorage.setItem(PICK_LIST_EVENT_STORAGE_KEY, pickListEvent);
+        localStorage.removeItem(LEGACY_PICK_LIST_EVENT_STORAGE_KEY);
+    }, [pickListEvent]);
 
     // Load backups from localStorage
     useEffect(() => {
@@ -325,37 +380,59 @@ export const usePickList = (eventKey?: string): UsePickListResult => {
     }, [teamStats]);
 
     useEffect(() => {
-        if (eventFilter === "all") {
-            return;
-        }
-
         // Don't validate/reset until we actually have keys to validate against.
         if (availableEventKeys.length === 0) {
             return;
         }
 
-        const canonicalEventKey = availableEventKeys.find(
-            (key) => key.trim().toLowerCase() === eventFilter.trim().toLowerCase()
-        );
+        if (normalizedEventKey) {
+            const canonicalEventKey = availableEventKeys.find(
+                (key) => key.trim().toLowerCase() === normalizedEventKey.toLowerCase()
+            );
 
-        if (!canonicalEventKey) {
-            setEventFilter("all");
+            if (canonicalEventKey && canonicalEventKey !== pickListEvent) {
+                setPickListEvent(canonicalEventKey);
+            }
             return;
         }
 
-        if (canonicalEventKey !== eventFilter) {
-            setEventFilter(canonicalEventKey);
+        if (!pickListEvent.trim()) {
+            setPickListEvent(availableEventKeys[0] ?? "");
+            return;
         }
-    }, [availableEventKeys, eventFilter]);
+
+        const canonicalEventKey = availableEventKeys.find(
+            (key) => key.trim().toLowerCase() === pickListEvent.trim().toLowerCase()
+        );
+
+        if (!canonicalEventKey) {
+            setPickListEvent(availableEventKeys[0] ?? "");
+            return;
+        }
+
+        if (canonicalEventKey !== pickListEvent) {
+            setPickListEvent(canonicalEventKey);
+        }
+    }, [availableEventKeys, pickListEvent, normalizedEventKey]);
 
     const eventFilteredTeams = useMemo(() => {
-        if (eventFilter === "all") {
+        const normalizedPickListEvent = pickListEvent.trim().toLowerCase();
+        if (!normalizedPickListEvent) {
             return teamStats;
         }
 
-        const normalizedEventFilter = eventFilter.trim().toLowerCase();
-        return teamStats.filter((team) => team.eventKey?.trim().toLowerCase() === normalizedEventFilter);
-    }, [teamStats, eventFilter]);
+        return teamStats.filter((team) => team.eventKey?.trim().toLowerCase() === normalizedPickListEvent);
+    }, [teamStats, pickListEvent]);
+
+    const availableTeams = useMemo(
+        () => dedupeTeamsByNumber(eventFilteredTeams, pickListEvent || normalizedEventKey),
+        [eventFilteredTeams, pickListEvent, normalizedEventKey]
+    );
+
+    const teamLookupTeams = useMemo(
+        () => dedupeTeamsByNumber(teamStats, pickListEvent || normalizedEventKey),
+        [teamStats, pickListEvent, normalizedEventKey]
+    );
 
     // Filtered and sorted teams
     const filteredAndSortedTeams = useMemo(() => {
@@ -367,7 +444,7 @@ export const usePickList = (eventKey?: string): UsePickListResult => {
                     : null,
         };
 
-        const filtered = filterTeams(eventFilteredTeams, searchFilter)
+        const filtered = filterTeams(availableTeams, searchFilter)
             .filter((team) => {
                 if (activeFilterIds.length === 0) {
                     return true;
@@ -388,7 +465,7 @@ export const usePickList = (eventKey?: string): UsePickListResult => {
 
         return sortTeams(filtered, sortBy);
     }, [
-        eventFilteredTeams,
+        availableTeams,
         searchFilter,
         activeFilterIds,
         sortBy,
@@ -641,8 +718,9 @@ export const usePickList = (eventKey?: string): UsePickListResult => {
 
     return {
         // Data
-        availableTeams: teamStats,
-        eventFilteredTeamCount: eventFilteredTeams.length,
+        availableTeams,
+        teamLookupTeams,
+        pickListEventTeamCount: availableTeams.length,
         filteredAndSortedTeams,
         pickLists,
         alliances,
@@ -656,7 +734,7 @@ export const usePickList = (eventKey?: string): UsePickListResult => {
         sortBy,
         activeFilterIds,
         defenseTargetTeamFilter,
-        eventFilter,
+        pickListEvent,
         availableEventKeys,
         activeTab,
         showAllianceSelection,
@@ -669,7 +747,7 @@ export const usePickList = (eventKey?: string): UsePickListResult => {
         setSortBy,
         setActiveFilterIds,
         setDefenseTargetTeamFilter,
-        setEventFilter,
+        setPickListEvent,
         setActiveTab,
         setAlliances,
         setBackups,

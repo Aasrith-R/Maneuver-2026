@@ -24,7 +24,8 @@ interface MobilePickListLayoutProps {
     alliances: Alliance[];
     backups: BackupTeam[];
     availableTeams: TeamStats[];
-    eventFilteredTeamCount: number;
+    teamLookupTeams: TeamStats[];
+    pickListEventTeamCount: number;
     newListName: string;
     newListDescription: string;
     searchFilter: string;
@@ -32,7 +33,7 @@ interface MobilePickListLayoutProps {
     activeFilterIds: string[];
     defenseTargetTeamFilter: string;
     hideAllianceAssignedTeams: boolean;
-    eventFilter: string;
+    pickListEvent: string;
     availableEventKeys: string[];
     canDeleteAll?: boolean;
     onTabChange: (tab: string) => void;
@@ -41,7 +42,7 @@ interface MobilePickListLayoutProps {
     onFilterChange: (filters: string[]) => void;
     onDefenseTargetTeamFilterChange: (value: string) => void;
     onToggleHideAllianceAssignedTeams: (hide: boolean) => void;
-    onEventFilterChange: (eventKey: string) => void;
+    onPickListEventChange: (eventKey: string) => void;
     onAddTeamToList: (team: TeamStats, listId: number) => void;
     onAddTeamToAlliance?: (teamNumber: number, allianceId: number) => void;
     onUpdateAlliances: (alliances: Alliance[]) => void;
@@ -69,7 +70,8 @@ export const MobilePickListLayout = ({
     alliances,
     backups,
     availableTeams,
-    eventFilteredTeamCount,
+    teamLookupTeams,
+    pickListEventTeamCount,
     newListName,
     newListDescription,
     searchFilter,
@@ -77,7 +79,7 @@ export const MobilePickListLayout = ({
     activeFilterIds,
     defenseTargetTeamFilter,
     hideAllianceAssignedTeams,
-    eventFilter,
+    pickListEvent,
     availableEventKeys,
     canDeleteAll = true,
     onTabChange,
@@ -86,7 +88,7 @@ export const MobilePickListLayout = ({
     onFilterChange,
     onDefenseTargetTeamFilterChange,
     onToggleHideAllianceAssignedTeams,
-    onEventFilterChange,
+    onPickListEventChange,
     onAddTeamToList,
     onAddTeamToAlliance,
     onUpdateAlliances,
@@ -125,7 +127,7 @@ export const MobilePickListLayout = ({
                 <TabsContent value="teams">
                     <AvailableTeamsPanel
                         teams={filteredAndSortedTeams}
-                        totalTeams={eventFilteredTeamCount}
+                        totalTeams={pickListEventTeamCount}
                         pickLists={pickLists}
                         alliances={alliances}
                         searchFilter={searchFilter}
@@ -133,14 +135,14 @@ export const MobilePickListLayout = ({
                         activeFilterIds={activeFilterIds}
                         defenseTargetTeamFilter={defenseTargetTeamFilter}
                         hideAllianceAssignedTeams={hideAllianceAssignedTeams}
-                        eventFilter={eventFilter}
+                        pickListEvent={pickListEvent}
                         availableEventKeys={availableEventKeys}
                         onSearchChange={onSearchChange}
                         onSortChange={onSortChange}
                         onFilterChange={onFilterChange}
                         onDefenseTargetTeamFilterChange={onDefenseTargetTeamFilterChange}
                         onToggleHideAllianceAssignedTeams={onToggleHideAllianceAssignedTeams}
-                        onEventFilterChange={onEventFilterChange}
+                        onPickListEventChange={onPickListEventChange}
                         onAddTeamToList={onAddTeamToList}
                         onAddTeamToAlliance={onAddTeamToAlliance}
                     />
@@ -152,6 +154,7 @@ export const MobilePickListLayout = ({
                             alliances={alliances}
                             backups={backups}
                             availableTeams={availableTeams}
+                            teamLookupTeams={teamLookupTeams}
                             onUpdateAlliances={onUpdateAlliances}
                             onUpdateBackups={onUpdateBackups}
                             onHasTeamPickListSnapshot={onHasTeamPickListSnapshot}
@@ -192,7 +195,7 @@ export const MobilePickListLayout = ({
                             <PickListCard
                                 key={list.id}
                                 pickList={list}
-                                availableTeams={availableTeams}
+                                teamLookupTeams={teamLookupTeams}
                                 alliances={alliances}
                                 canDelete={canDeleteAll}
                                 onDeleteList={onDeleteList}

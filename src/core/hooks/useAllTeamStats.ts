@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAllMatches } from "./useAllMatches";
 import { calculateTeamStats } from "@/game-template/calculations";
 import { calculateFuelOPRHybrid } from "@/game-template/fuelOpr";
+import type { ScoutingEntry } from "@/game-template/scoring";
 import { getCachedCOPREventKeys, getCachedEventCOPRs } from "@/core/lib/tba/coprUtils";
 import { getCachedEventStatboticsEPA, getCachedStatboticsEventKeys } from "@/core/lib/statbotics/epaUtils";
 import { getCachedTBAEventKeys, getCachedTBAEventMatches } from "@/core/lib/tbaCache";
@@ -50,11 +51,12 @@ export const useAllTeamStats = (eventKey?: string): UseAllTeamStatsResult => {
         let cancelled = false;
 
         const loadFuelOprMap = async () => {
+            const cachedTbaEventKeys = await getCachedTBAEventKeys();
             const relevantEventKeys = eventKey
                 ? [eventKey]
                 : [...new Set([
                     ...matches.map(match => match.eventKey).filter((key): key is string => !!key),
-                    ...getCachedTBAEventKeys(),
+                    ...cachedTbaEventKeys,
                 ])];
 
             if (relevantEventKeys.length === 0) {

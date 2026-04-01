@@ -44,14 +44,14 @@ interface AvailableTeamsPanelProps {
     activeFilterIds: string[];
     defenseTargetTeamFilter: string;
     hideAllianceAssignedTeams: boolean;
-    eventFilter: string;
+    pickListEvent: string;
     availableEventKeys: string[];
     onSearchChange: (value: string) => void;
     onSortChange: (value: PickListSortOption) => void;
     onFilterChange: (value: string[]) => void;
     onDefenseTargetTeamFilterChange: (value: string) => void;
     onToggleHideAllianceAssignedTeams: (hide: boolean) => void;
-    onEventFilterChange: (eventKey: string) => void;
+    onPickListEventChange: (eventKey: string) => void;
     onAddTeamToList: (team: TeamStats, listId: number) => void;
     onAddTeamToAlliance?: (teamNumber: number, allianceId: number) => void;
 }
@@ -66,14 +66,14 @@ export const AvailableTeamsPanel = ({
     activeFilterIds,
     defenseTargetTeamFilter,
     hideAllianceAssignedTeams,
-    eventFilter,
+    pickListEvent,
     availableEventKeys,
     onSearchChange,
     onSortChange,
     onFilterChange,
     onDefenseTargetTeamFilterChange,
     onToggleHideAllianceAssignedTeams,
-    onEventFilterChange,
+    onPickListEventChange,
     onAddTeamToList,
     onAddTeamToAlliance
 }: AvailableTeamsPanelProps) => {
@@ -153,19 +153,25 @@ export const AvailableTeamsPanel = ({
                         value={searchFilter}
                         onChange={(e) => onSearchChange(e.target.value)}
                     />
-                    <Select value={eventFilter} onValueChange={onEventFilterChange}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Filter by event" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Events</SelectItem>
-                            {availableEventKeys.map((eventKey) => (
-                                <SelectItem key={eventKey} value={eventKey}>
-                                    {eventKey}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    {availableEventKeys.length > 0 && (
+                        <div className="space-y-1">
+                            <Label htmlFor="pick-list-event-select" className="text-sm font-medium">
+                                Pick List Event
+                            </Label>
+                            <Select value={pickListEvent} onValueChange={onPickListEventChange}>
+                                <SelectTrigger id="pick-list-event-select">
+                                    <SelectValue placeholder="Select pick list event" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {availableEventKeys.map((eventKey) => (
+                                        <SelectItem key={eventKey} value={eventKey}>
+                                            {eventKey}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
                     <SortSelector sortBy={sortBy} onSortChange={onSortChange} />
                     <div className="space-y-2 rounded-md border p-3">
                         <div className="flex items-center justify-between">
