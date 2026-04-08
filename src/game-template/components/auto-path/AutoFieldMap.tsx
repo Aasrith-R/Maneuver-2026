@@ -52,6 +52,8 @@ import {
 } from "@/game-template/scout-options";
 import { CORE_SCOUT_OPTION_KEYS } from "@/core/components/GameStartComponents/ScoutOptionsSheet";
 
+import { FerryTypePopup } from "@/game-template/components/field-map/FerryTypePopup";
+
 // Local sub-components
 import { AutoActionLog } from "./components/AutoActionLog";
 import { AutoStartConfirmation } from "./components/AutoStartConfirmation";
@@ -76,7 +78,6 @@ const START_KEY_LABELS: Record<'trench1' | 'bump1' | 'hub' | 'bump2' | 'trench2'
 };
 
 const MOVING_SHOT_MIN_PATH_LENGTH = 0.05;
-const AUTO_SWITCH_ONCE_STORAGE_PREFIX = 'autoSwitchToTeleopDone';
 const AUTO_CUE_TARGET_MS = 20000;
 
 const getPathLength = (points: { x: number; y: number }[]): number => {
@@ -210,8 +211,6 @@ function AutoFieldMapContent({
         containerRef,
         isSelectingScore,
         setIsSelectingScore,
-        isSelectingPass,
-        setIsSelectingPass,
         isSelectingCollect,
         setIsSelectingCollect,
     } = useAutoScoring();
@@ -233,8 +232,8 @@ function AutoFieldMapContent({
 
     const autoElementHotkeys: Partial<Record<string, string>> = {
         hub: 'S',
-        pass: 'A',
-        pass_alliance: 'A',
+        ferry: 'A',
+        beached: 'B',
         tower: 'F',
         depot: 'C',
         outpost: 'G',
@@ -246,22 +245,9 @@ function AutoFieldMapContent({
     const navigate = useNavigate();
     const location = useLocation();
     const { transformation } = useGame();
-    const autoSwitchOnceStorageKey = useMemo(() => {
-        const eventKey = location.state?.inputs?.eventKey ?? 'unknown-event';
-        const matchType = location.state?.inputs?.matchType ?? 'qm';
-        const matchNumber = location.state?.inputs?.matchNumber ?? 'unknown-match';
-        const teamNumber = location.state?.inputs?.selectTeam ?? 'unknown-team';
-        return `${AUTO_SWITCH_ONCE_STORAGE_PREFIX}:${eventKey}:${matchType}:${matchNumber}:${teamNumber}`;
-    }, [
-        location.state?.inputs?.eventKey,
-        location.state?.inputs?.matchType,
-        location.state?.inputs?.matchNumber,
-        location.state?.inputs?.selectTeam,
-    ]);
 
     const fieldCanvasRef = useRef<FieldCanvasRef>(null);
     const autoScreenEnteredAtRef = useRef(Date.now());
-    const hasAutoAdvancedRef = useRef(false);
     const startSeedInFlightRef = useRef(false);
     const canvasRef = useMemo(() => ({
         get current() { return fieldCanvasRef.current?.canvas ?? null; }
@@ -276,6 +262,10 @@ function AutoFieldMapContent({
     const [actionLogOpen, setActionLogOpen] = useState(false);
     const [pendingShotTypeWaypoint, setPendingShotTypeWaypoint] = useState<PathWaypoint | null>(null);
     const [focusClimbTimeInputOnOpen, setFocusClimbTimeInputOnOpen] = useState(false);
+    type FerryFlowStep = 'ferry-type' | 'fuel';
+    const [ferryFlowStep, setFerryFlowStep] = useState<FerryFlowStep | null>(null);
+    const [pendingFerry, setPendingFerry] = useState<PathWaypoint | null>(null);
+    const [beachedStart, setBeachedStart] = useState<number | null>(null);
     const [autoElapsedMs, setAutoElapsedMs] = useState(0);
     const [elapsedSinceStartConfirmationMs, setElapsedSinceStartConfirmationMs] = useState(0);
 
@@ -296,8 +286,6 @@ function AutoFieldMapContent({
         effectiveScoutOptions[CORE_SCOUT_OPTION_KEYS.startAutoCueFromStartConfirmation] !== false;
     const startAutoCueFromAutoScreenEntry =
         effectiveScoutOptions[CORE_SCOUT_OPTION_KEYS.startAutoCueFromAutoScreenEntry] === true;
-    const autoAdvanceToTeleopAfter20s =
-        effectiveScoutOptions[CORE_SCOUT_OPTION_KEYS.autoAdvanceToTeleopAfter20s] === true;
     const firstConfirmedStartTimestamp = useMemo(() => {
         const firstStartAction = actions.find((action) => action.type === 'start');
         return typeof firstStartAction?.timestamp === 'number'
@@ -306,16 +294,16 @@ function AutoFieldMapContent({
     }, [actions]);
     const autoCueTimerStartTimestamp = startAutoCueFromAutoScreenEntry
         ? autoScreenEnteredAtRef.current
-        : ((startAutoCueFromStartConfirmation || autoAdvanceToTeleopAfter20s) ? firstConfirmedStartTimestamp : null);
+        : (startAutoCueFromStartConfirmation ? firstConfirmedStartTimestamp : null);
     const autoCueCountdownSeconds = autoCueTimerStartTimestamp === null
         ? null
         : Math.max(0, Math.ceil((AUTO_CUE_TARGET_MS - autoElapsedMs) / 1000));
-    const shouldPulseAutoBorder = autoElapsedMs >= AUTO_CUE_TARGET_MS;
-    const shouldAutoAdvanceToTeleop = autoAdvanceToTeleopAfter20s && elapsedSinceStartConfirmationMs >= AUTO_CUE_TARGET_MS;
+    const isAutoCountdownActive = firstConfirmedStartTimestamp !== null && elapsedSinceStartConfirmationMs < AUTO_CUE_TARGET_MS;
+    const autoCountdownSeconds = isAutoCountdownActive
+        ? Math.max(0, Math.ceil((AUTO_CUE_TARGET_MS - elapsedSinceStartConfirmationMs) / 1000))
+        : null;
     const disableHubFuelScoringPopup =
         effectiveScoutOptions[GAME_SCOUT_OPTION_KEYS.disableHubFuelScoringPopup] === true;
-    const disablePassingPopup =
-        effectiveScoutOptions[GAME_SCOUT_OPTION_KEYS.disablePassingPopup] === true;
     const disablePathDrawingTapOnly =
         effectiveScoutOptions[GAME_SCOUT_OPTION_KEYS.disableAutoPathDrawingTapOnly] === true;
 
@@ -352,7 +340,7 @@ function AutoFieldMapContent({
         canvasRef,
         isFieldRotated,
         alliance,
-        isEnabled: isSelectingScore || isSelectingPass || isSelectingCollect,
+        isEnabled: isSelectingScore || isSelectingCollect,
         onDrawComplete: (points) => handleInteractionEnd(points),
         zoneBounds: currentZoneBounds,
     });
@@ -389,7 +377,6 @@ function AutoFieldMapContent({
 
     useEffect(() => {
         if (firstConfirmedStartTimestamp === null) {
-            hasAutoAdvancedRef.current = false;
             setElapsedSinceStartConfirmationMs(0);
             return;
         }
@@ -463,8 +450,8 @@ function AutoFieldMapContent({
         .filter(a => a.type === 'score')
         .reduce((sum, a) => sum + Math.abs(a.fuelDelta || 0), 0);
 
-    const totalFuelPassed = actions
-        .filter(a => a.type === 'pass')
+    const totalFuelFerried = actions
+        .filter(a => a.type === 'ferry')
         .reduce((sum, a) => sum + Math.abs(a.fuelDelta || 0), 0);
 
 
@@ -525,6 +512,13 @@ function AutoFieldMapContent({
             localStorage.setItem('autoBrokenDownStart', String(now));
         }
     };
+
+    const cancelFerryFlow = useCallback(() => {
+        setPendingFerry(null);
+        setFerryFlowStep(null);
+        setAccumulatedFuel(0);
+        setFuelHistory([]);
+    }, [setAccumulatedFuel, setFuelHistory]);
 
     const handleElementClick = useCallback((elementKey: string) => {
         const element = FIELD_ELEMENTS[elementKey as keyof typeof FIELD_ELEMENTS];
@@ -604,7 +598,7 @@ function AutoFieldMapContent({
         }
 
         // Block clicks while any popup is active or robot is stuck elsewhere or broken down
-        if (pendingWaypoint || pendingShotTypeWaypoint || isSelectingScore || isSelectingPass || isSelectingCollect || selectedStartKey || (!clearedPersistentStuck && isAnyStuck) || isBrokenDown) {
+        if (pendingWaypoint || pendingShotTypeWaypoint || ferryFlowStep !== null || isSelectingScore || isSelectingCollect || selectedStartKey || (!clearedPersistentStuck && isAnyStuck) || isBrokenDown) {
             return;
         }
 
@@ -620,7 +614,21 @@ function AutoFieldMapContent({
 
         switch (elementKey) {
             case 'hub':
-                setIsSelectingScore(true);
+                if (disableHubFuelScoringPopup) {
+                    addWaypoint('score', 'hub', position);
+                } else {
+                    setPendingWaypoint({
+                        id: generateId(),
+                        type: 'score',
+                        action: 'hub',
+                        position,
+                        fuelDelta: 0,
+                        amountLabel: '...',
+                        timestamp: Date.now(),
+                    });
+                    setAccumulatedFuel(0);
+                    setFuelHistory([]);
+                }
                 break;
             case 'depot':
             case 'outpost':
@@ -657,14 +665,49 @@ function AutoFieldMapContent({
                 }
                 break;
             }
-            case 'pass':
-            case 'pass_alliance':
-                setIsSelectingPass(true); // Enter pass position selection mode
-                break;
             case 'collect_neutral':
             case 'collect_alliance':
                 setIsSelectingCollect(true); // Enter collect position selection mode
                 break;
+            case 'pass':
+            case 'pass_alliance':
+            case 'ferry':
+                setPendingFerry({
+                    id: generateId(),
+                    type: 'ferry',
+                    action: 'ferry',
+                    position,
+                    timestamp: Date.now(),
+                } as any);
+                setFerryFlowStep('ferry-type');
+                break;
+            case 'beached': {
+                const isCurrentlyBeached = beachedStart !== null;
+                if (isCurrentlyBeached) {
+                    const duration = Math.min(Date.now() - beachedStart, AUTO_PHASE_DURATION_MS);
+                    onAddAction({
+                        id: generateId(),
+                        type: 'unbeached',
+                        action: 'unbeached',
+                        position,
+                        timestamp: Date.now(),
+                        duration,
+                        zone: 'neutralZone',
+                    } as any);
+                    setBeachedStart(null);
+                } else {
+                    onAddAction({
+                        id: generateId(),
+                        type: 'beached',
+                        action: 'beached',
+                        position,
+                        timestamp: Date.now(),
+                        zone: 'neutralZone',
+                    } as any);
+                    setBeachedStart(Date.now());
+                }
+                break;
+            }
             case 'opponent_foul':
                 addWaypoint('foul', 'mid-line-penalty', position);
                 break;
@@ -672,23 +715,30 @@ function AutoFieldMapContent({
     }, [
         actions.length,
         addWaypoint,
+        beachedStart,
+        currentZone,
+        disableHubFuelScoringPopup,
+        ferryFlowStep,
         generateId,
         isAnyStuck,
         isBrokenDown,
         isSelectingCollect,
-        isSelectingPass,
         isSelectingScore,
         onAddAction,
         pendingShotTypeWaypoint,
         pendingWaypoint,
         recordingMode,
         selectedStartKey,
+        setAccumulatedFuel,
+        setBeachedStart,
         setClimbLocation,
         setClimbResult,
+        setFerryFlowStep,
         setFocusClimbTimeInputOnOpen,
+        setFuelHistory,
         setIsSelectingCollect,
-        setIsSelectingPass,
         setIsSelectingScore,
+        setPendingFerry,
         setPendingWaypoint,
         setSelectedStartKey,
         setStuckElementKey,
@@ -743,28 +793,6 @@ function AutoFieldMapContent({
                 }
             }
             setIsSelectingScore(false);
-        } else if (isSelectingPass) {
-            const waypoint: PathWaypoint = {
-                id: generateId(),
-                type: 'pass',
-                action: shouldUsePath ? 'pass-path' : 'partner',
-                position: pos,
-                fuelDelta: 0,
-                amountLabel: disablePassingPopup ? undefined : '...',
-                timestamp: Date.now(),
-                pathPoints: shouldUsePath ? points : undefined,
-            };
-            if (disablePassingPopup) {
-                onAddAction(waypoint);
-                setAccumulatedFuel(0);
-                setFuelHistory([]);
-                setPendingWaypoint(null);
-            } else {
-                setAccumulatedFuel(0);
-                setFuelHistory([]);
-                setPendingWaypoint(waypoint);
-            }
-            setIsSelectingPass(false);
         } else if (isSelectingCollect) {
             // Collect still immediate as per plan or consolidate too? 
             // The user said: "I don't think we need to track it for collect, we really only care about how many they scored"
@@ -860,6 +888,22 @@ function AutoFieldMapContent({
             setStuckStarts(nextStuckStarts);
         }
 
+        // Capture active beached time before proceeding
+        if (beachedStart) {
+            const beachedElement = FIELD_ELEMENTS['beached'];
+            const duration = Math.min(Date.now() - beachedStart, AUTO_PHASE_DURATION_MS);
+            finalActions.push({
+                id: generateId(),
+                type: 'unbeached',
+                action: 'unbeached',
+                position: beachedElement ? { x: beachedElement.x, y: beachedElement.y } : { x: 0, y: 0 },
+                timestamp: Date.now(),
+                duration,
+                zone: 'neutralZone',
+            } as any);
+            setBeachedStart(null);
+        }
+
         if (brokenDownStart) {
             const duration = Date.now() - brokenDownStart;
             const finalTotal = totalBrokenDownTime + duration;
@@ -871,7 +915,9 @@ function AutoFieldMapContent({
         onProceed,
         stuckStarts,
         actions,
+        beachedStart,
         generateId,
+        setBeachedStart,
         setStuckStarts,
         brokenDownStart,
         totalBrokenDownTime,
@@ -888,6 +934,11 @@ function AutoFieldMapContent({
 
             if (key === 'escape') {
                 event.preventDefault();
+
+                if (ferryFlowStep !== null) {
+                    cancelFerryFlow();
+                    return;
+                }
 
                 if (pendingShotTypeWaypoint) {
                     setPendingShotTypeWaypoint(null);
@@ -912,12 +963,6 @@ function AutoFieldMapContent({
 
                 if (isSelectingScore) {
                     setIsSelectingScore(false);
-                    resetDrawing();
-                    return;
-                }
-
-                if (isSelectingPass) {
-                    setIsSelectingPass(false);
                     resetDrawing();
                     return;
                 }
@@ -986,12 +1031,13 @@ function AutoFieldMapContent({
             const visibleAutoElementSet = new Set<string>(visibleAutoElements);
 
             const canScoreFromZone = visibleAutoElementSet.has('hub');
-            const canPassFromZone = visibleAutoElementSet.has('pass') || visibleAutoElementSet.has('pass_alliance');
             const canCollectFromZone = visibleAutoElementSet.has('collect_alliance') || visibleAutoElementSet.has('collect_neutral');
             const canDepotFromZone = visibleAutoElementSet.has('depot');
             const canOutpostFromZone = visibleAutoElementSet.has('outpost');
             const canFoulFromZone = visibleAutoElementSet.has('opponent_foul');
             const canClimbFromZone = visibleAutoElementSet.has('tower');
+            const canFerryFromAutoZone = visibleAutoElementSet.has('ferry');
+            const canBeachedFromAutoZone = visibleAutoElementSet.has('beached');
 
             const canUseTraversalHotkeys =
                 actions.length === 0
@@ -1024,7 +1070,6 @@ function AutoFieldMapContent({
 
             const isBusyWithSelection =
                 isSelectingScore ||
-                isSelectingPass ||
                 isSelectingCollect ||
                 isAnyStuck ||
                 isBrokenDown ||
@@ -1035,14 +1080,24 @@ function AutoFieldMapContent({
             if (key === 's') {
                 if (actions.length === 0 || !canScoreFromZone) return;
                 event.preventDefault();
-                setIsSelectingScore(true);
+                handleElementClick('hub');
                 return;
             }
 
             if (key === 'a') {
-                if (actions.length === 0 || !canPassFromZone) return;
+                if (actions.length === 0) return;
+                if (canFerryFromAutoZone) {
+                    event.preventDefault();
+                    handleElementClick('ferry');
+                    return;
+                }
+                return;
+            }
+
+            if (key === 'b') {
+                if (!canBeachedFromAutoZone) return;
                 event.preventDefault();
-                setIsSelectingPass(true);
+                handleElementClick('beached');
                 return;
             }
 
@@ -1099,22 +1154,23 @@ function AutoFieldMapContent({
         actions.length,
         addWaypoint,
         brokenDownStart,
+        cancelFerryFlow,
         currentZone,
+        ferryFlowStep,
         generateId,
+        handleElementClick,
         isAnyStuck,
         isBrokenDown,
         isSelectingCollect,
-        isSelectingPass,
         isSelectingScore,
+        isFieldRotated,
         onUndo,
         pendingShotTypeWaypoint,
         pendingWaypoint,
         proceedToTeleop,
         recordingMode,
         resetDrawing,
-        isFieldRotated,
         selectedStartKey,
-        handleElementClick,
         setAccumulatedFuel,
         setBrokenDownStart,
         setClimbResult,
@@ -1122,7 +1178,6 @@ function AutoFieldMapContent({
         setFuelHistory,
         setFocusClimbTimeInputOnOpen,
         setIsSelectingCollect,
-        setIsSelectingPass,
         setIsSelectingScore,
         setPendingWaypoint,
         setSelectedStartKey,
@@ -1137,42 +1192,6 @@ function AutoFieldMapContent({
         }
     }, [pendingWaypoint]);
 
-    useEffect(() => {
-        if (recordingMode || hasAutoAdvancedRef.current) return;
-        if (!shouldAutoAdvanceToTeleop) return;
-        if (sessionStorage.getItem(autoSwitchOnceStorageKey) === 'true') return;
-
-        const isBusyWithAction =
-            pendingWaypoint !== null ||
-            pendingShotTypeWaypoint !== null ||
-            isSelectingScore ||
-            isSelectingPass ||
-            isSelectingCollect ||
-            selectedStartKey !== null ||
-            showPostClimbProceed ||
-            hookDrawingPoints.length > 0;
-
-        if (isBusyWithAction) return;
-
-        hasAutoAdvancedRef.current = true;
-        sessionStorage.setItem(autoSwitchOnceStorageKey, 'true');
-        toast.info("Switching to Teleop");
-        proceedToTeleop();
-    }, [
-        recordingMode,
-        shouldAutoAdvanceToTeleop,
-        autoSwitchOnceStorageKey,
-        pendingWaypoint,
-        pendingShotTypeWaypoint,
-        isSelectingScore,
-        isSelectingPass,
-        isSelectingCollect,
-        selectedStartKey,
-        showPostClimbProceed,
-        hookDrawingPoints,
-        proceedToTeleop,
-    ]);
-
     // ==========================================================================
     // RENDER
     // ==========================================================================
@@ -1186,7 +1205,7 @@ function AutoFieldMapContent({
                 headerInputSlot={headerInputSlot}
                 stats={recordingMode ? [] : [
                     { label: 'Scored', value: totalFuelScored, color: 'green' },
-                    { label: 'Passed', value: totalFuelPassed, color: 'purple' },
+                    { label: 'Ferried', value: totalFuelFerried, color: 'purple' },
                 ]}
                 hideStats={recordingMode}
                 customActionSlot={recordingMode ? recordingActionSlot : undefined}
@@ -1204,8 +1223,8 @@ function AutoFieldMapContent({
                 onUndo={handleUndo}
                 onBack={onBack}
                 onProceed={recordingMode ? undefined : proceedToTeleop}
-                highlightProceed={shouldPulseAutoBorder}
-                proceedCountdownSeconds={autoCueCountdownSeconds}
+                highlightProceed={false}
+                proceedCountdownSeconds={autoCountdownSeconds ?? autoCueCountdownSeconds}
                 toggleFieldOrientation={toggleFieldOrientation}
                 isBrokenDown={isBrokenDown}
                 onBrokenDownToggle={recordingMode ? undefined : handleBrokenDownToggle}
@@ -1219,14 +1238,14 @@ function AutoFieldMapContent({
                 <div
                     ref={containerRef}
                     className={cn(
-                        "relative rounded-lg overflow-hidden border border-slate-700 bg-slate-900 select-none",
+                        "relative rounded-lg overflow-hidden border bg-slate-900 select-none",
                         "w-full aspect-2/1",
                         isFullscreen ? "max-h-[85vh] m-auto" : "h-auto",
-                        shouldPulseAutoBorder && "border-green-500 animate-pulse",
-                        isFieldRotated && "rotate-180" // 180° rotation for field orientation preference
+                        "border-slate-700",
+                        isFieldRotated && "rotate-180"
                     )}
                 >
-                {!pendingShotTypeWaypoint && (isSelectingScore || isSelectingPass || isSelectingCollect) && (
+                {!pendingShotTypeWaypoint && (isSelectingScore || isSelectingCollect) && (
                     <div
                         className={cn(
                             "absolute inset-x-0 top-1 z-30 flex pointer-events-none",
@@ -1244,25 +1263,20 @@ function AutoFieldMapContent({
                                     "text-[10px] sm:text-xs",
                                     isSelectingScore
                                         ? "bg-green-600"
-                                        : isSelectingPass
-                                            ? "bg-purple-600"
-                                            : "bg-yellow-600"
+                                        : "bg-yellow-600"
                                 )}
                             >
-                                {isSelectingScore ? 'SCORING' : isSelectingPass ? 'PASSING' : 'COLLECT'}
+                                {isSelectingScore ? 'SCORING' : 'COLLECT'}
                             </Badge>
                             <span className="text-xs sm:text-sm font-medium truncate">
                                 {isSelectingScore
                                     ? (disablePathDrawingTapOnly ? 'Tap where scored' : 'Tap/draw where scored')
-                                    : isSelectingPass
-                                        ? (disablePathDrawingTapOnly ? 'Tap where passed' : 'Tap/draw pass')
-                                        : (disablePathDrawingTapOnly ? 'Tap where collected' : 'Tap/draw collect')}
+                                    : (disablePathDrawingTapOnly ? 'Tap where collected' : 'Tap/draw collect')}
                             </span>
                             <Button
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     if (isSelectingScore) setIsSelectingScore(false);
-                                    if (isSelectingPass) setIsSelectingPass(false);
                                     if (isSelectingCollect) setIsSelectingCollect(false);
                                     resetDrawing();
                                 }}
@@ -1295,7 +1309,7 @@ function AutoFieldMapContent({
                     width={canvasDimensions.width}
                     height={canvasDimensions.height}
                     isSelectingScore={isSelectingScore}
-                    isSelectingPass={isSelectingPass}
+                    isSelectingPass={false}
                     isSelectingCollect={isSelectingCollect}
                     drawConnectedPaths={true}
                     drawingZoneBounds={currentZoneBounds}
@@ -1305,7 +1319,7 @@ function AutoFieldMapContent({
                 />
 
                 {/* Overlay Buttons */}
-                {!pendingShotTypeWaypoint && !isSelectingScore && !isSelectingPass && !isSelectingCollect && (
+                {!pendingShotTypeWaypoint && !isSelectingScore && !isSelectingCollect && ferryFlowStep === null && (
                     <div className="absolute inset-0 z-10">
                         {actions.length === 0 ? (
                             <>
@@ -1321,7 +1335,7 @@ function AutoFieldMapContent({
                                         isFieldRotated={isFieldRotated}
                                         containerWidth={canvasDimensions.width}
                                         overrideX={0.28}
-                                        isDisabled={!!(pendingWaypoint || isSelectingScore || isSelectingPass || isSelectingCollect || selectedStartKey)}
+                                        isDisabled={!!(pendingWaypoint || isSelectingScore || isSelectingCollect || selectedStartKey)}
                                     />
                                 ))}
                             </>
@@ -1329,11 +1343,13 @@ function AutoFieldMapContent({
                             <>
                                 {getVisibleElements('auto', currentZone).map(key => {
                                     const isPersistentStuck = !!stuckStarts[key];
-                                    const isPopupActive = !!(pendingWaypoint || isSelectingScore || isSelectingPass || isSelectingCollect || selectedStartKey);
+                                    const isPopupActive = !!(pendingWaypoint || isSelectingScore || isSelectingCollect || selectedStartKey);
                                     const displayElement =
                                         key === 'hub' && actions.length > 0
                                             ? { ...FIELD_ELEMENTS[key]!, name: 'Score' }
                                             : FIELD_ELEMENTS[key]!;
+
+                                    const isBeachedActive = key === 'beached' && beachedStart !== null;
 
                                     return (
                                         <FieldButton
@@ -1346,9 +1362,9 @@ function AutoFieldMapContent({
                                             alliance={alliance}
                                             isFieldRotated={isFieldRotated}
                                             containerWidth={canvasDimensions.width}
-                                            isStuck={recordingMode ? false : isPersistentStuck}
+                                            isStuck={recordingMode ? false : (isPersistentStuck || isBeachedActive)}
                                             isPotentialStuck={recordingMode ? false : stuckElementKey === key}
-                                            isDisabled={isPopupActive || (isAnyStuck && !isPersistentStuck)}
+                                            isDisabled={key === 'beached' ? false : (isPopupActive || (isAnyStuck && !isPersistentStuck))}
                                         />
                                     );
                                 })}
@@ -1404,7 +1420,55 @@ function AutoFieldMapContent({
                         onProceed={proceedToTeleop}
                         onStay={() => setShowPostClimbProceed(false)}
                         nextPhaseName="Teleop"
-                        highlightProceed={shouldPulseAutoBorder}
+                        highlightProceed={false}
+                    />
+                )}
+
+                {ferryFlowStep === 'ferry-type' && (
+                    <FerryTypePopup
+                        isFieldRotated={isFieldRotated}
+                        onSelect={(ft) => {
+                            setPendingFerry((prev) => (prev ? { ...prev, ferryType: ft } : prev));
+                            setAccumulatedFuel(0);
+                            setFuelHistory([]);
+                            setFerryFlowStep('fuel');
+                        }}
+                        onCancel={cancelFerryFlow}
+                    />
+                )}
+
+                {ferryFlowStep === 'fuel' && pendingFerry && (
+                    <PendingWaypointPopup
+                        pendingWaypoint={pendingFerry}
+                        accumulatedFuel={accumulatedFuel}
+                        fuelHistory={fuelHistory}
+                        isFieldRotated={isFieldRotated}
+                        alliance={alliance}
+                        robotCapacity={robotCapacity}
+                        onFuelSelect={(value: number) => {
+                            setAccumulatedFuel(prev => prev + value);
+                            setFuelHistory(prev => [...prev, value]);
+                        }}
+                        onFuelUndo={() => {
+                            if (fuelHistory.length === 0) return;
+                            const lastDelta = fuelHistory[fuelHistory.length - 1]!;
+                            setAccumulatedFuel(prev => Math.max(0, prev - lastDelta));
+                            setFuelHistory(prev => prev.slice(0, -1));
+                        }}
+                        climbResult={null}
+                        onClimbResultSelect={() => {}}
+                        onConfirm={() => {
+                            onAddAction({
+                                ...pendingFerry,
+                                fuelDelta: accumulatedFuel,
+                                amountLabel: String(accumulatedFuel),
+                            } as PathWaypoint);
+                            setPendingFerry(null);
+                            setFerryFlowStep(null);
+                            setAccumulatedFuel(0);
+                            setFuelHistory([]);
+                        }}
+                        onCancel={cancelFerryFlow}
                     />
                 )}
 
@@ -1462,8 +1526,8 @@ function AutoFieldMapContent({
                                         : '';
                                 label = `${locationLabel} ${climbResult === 'success' ? 'Succeeded' : 'Failed'}`.trim();
                             } else {
-                                delta = pendingWaypoint.type === 'score' || pendingWaypoint.type === 'pass' ? -accumulatedFuel : 0;
-                                label = pendingWaypoint.type === 'score' ? `+${accumulatedFuel}` : `Pass (${accumulatedFuel})`;
+                                delta = pendingWaypoint.type === 'score' ? -accumulatedFuel : 0;
+                                label = pendingWaypoint.type === 'score' ? `+${accumulatedFuel}` : '';
                             }
 
                             const finalized: PathWaypoint = {
@@ -1506,7 +1570,10 @@ function AutoFieldMapContent({
 
     if (isFullscreen) {
         return (
-            <div className="fixed inset-0 z-100 bg-background p-4 flex flex-col">
+            <div className={cn(
+                "fixed inset-0 z-100 bg-background p-4 flex flex-col",
+                autoCountdownSeconds !== null && autoCountdownSeconds <= 3 && autoCountdownSeconds > 0 && "ring-4 ring-inset ring-red-500 auto-countdown-flash"
+            )}>
                 {content}
             </div>
         );

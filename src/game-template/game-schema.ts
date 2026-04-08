@@ -69,14 +69,14 @@ export const zones = {
         description: "Score fuel, collect from depot/outpost",
         color: "rgba(34, 197, 94, 0.4)", // Green
         bounds: { x: 0, y: 0, width: 198, height: 480 },
-        actions: ['score', 'pass'] as const,
+        actions: ['score', 'ferry'] as const,
     },
     neutralZone: {
         label: "Neutral Zone",
-        description: "Collect from pile, pass to partner",
+        description: "Collect from pile, ferry to partner",
         color: "rgba(234, 179, 8, 0.4)", // Yellow
         bounds: { x: 198, y: 0, width: 244, height: 480 },
-        actions: ['pass'] as const,
+        actions: ['ferry'] as const,
     },
     opponentZone: {
         label: "Opponent Zone",
@@ -133,12 +133,31 @@ export const actions = {
         pathType: 'collect',
         pathAction: 'outpost',
     },
-    // Fuel passed to alliance zone (pathType: 'pass')
-    fuelPassed: {
-        label: "Fuel Passed",
-        description: "Fuel passed to alliance zone",
+    // Fuel ferried to alliance zone (pathType: 'ferry')
+    fuelFerried: {
+        label: "Fuel Ferried",
+        description: "Fuel ferried to alliance zone",
         points: { auto: 0, teleop: 0 },
-        pathType: 'pass',
+        pathType: 'ferry',
+    },
+    ferryOnTheMove: {
+        label: "Ferry On The Move",
+        description: "Ferried while robot was moving",
+        points: { auto: 0, teleop: 0 },
+        pathType: 'ferry',
+    },
+    ferryStationary: {
+        label: "Ferry Stationary",
+        description: "Ferried while robot was stationary",
+        points: { auto: 0, teleop: 0 },
+        pathType: 'ferry',
+    },
+    // Beached in neutral zone
+    beached: {
+        label: "Beached",
+        description: "Robot was beached/stuck in neutral zone",
+        points: { auto: 0, teleop: 0 },
+        pathType: 'beached',
     },
     // Foul (pathType: 'foul')
     foulCommitted: {
@@ -215,9 +234,9 @@ export const toggles = {
             description: "Collected fuel from the Alliance Zone and Scored",
             group: "roleActive",
         },
-        roleActivePasser: {
-            label: "Passer",
-            description: "Passed fuel to alliance partners",
+        roleActiveFerrier: {
+            label: "Ferrier",
+            description: "Ferried fuel to alliance partners",
             group: "roleActive",
         },
         roleActiveDefense: {
@@ -242,9 +261,9 @@ export const toggles = {
             description: "Collected fuel from the Alliance Zone and Scored",
             group: "roleInactive",
         },
-        roleInactivePasser: {
-            label: "Passer",
-            description: "Passed fuel to alliance partners",
+        roleInactiveFerrier: {
+            label: "Ferrier",
+            description: "Ferried fuel to alliance partners",
             group: "roleInactive",
         },
         roleInactiveDefense: {
@@ -263,21 +282,21 @@ export const toggles = {
             group: "roleInactive",
         },
 
-        // Passing zones (multi-select, group: "passingZone")
-        passedToAllianceFromNeutral: {
-            label: "Neutral → Alliance",
-            description: "Passed fuel from neutral zone to alliance zone",
-            group: "passingZone",
+        // Ferrying zones (multi-select, group: "ferryingZone")
+        ferriedToAllianceFromNeutral: {
+            label: "Neutral → Alliance (Ferry)",
+            description: "Ferried fuel from neutral zone to alliance zone",
+            group: "ferryingZone",
         },
-        passedToAllianceFromOpponent: {
-            label: "Opponent → Alliance",
-            description: "Passed fuel from opponent zone to alliance zone",
-            group: "passingZone",
+        ferriedToAllianceFromOpponent: {
+            label: "Opponent → Alliance (Ferry)",
+            description: "Ferried fuel from opponent zone to alliance zone",
+            group: "ferryingZone",
         },
-        passedToNeutral: {
-            label: "Opponent → Neutral Zone",
-            description: "Passed fuel from opponent zone to neutral zone",
-            group: "passingZone",
+        ferriedToNeutral: {
+            label: "Opponent → Neutral Zone (Ferry)",
+            description: "Ferried fuel from opponent zone to neutral zone",
+            group: "ferryingZone",
         },
 
         // Teleop traversal confirmation (post-match)
@@ -363,7 +382,7 @@ export const strategyColumns = {
     // Overall stats (use rawValues for user-selectable aggregation)
     overall: {
         "rawValues.totalFuel": { label: "Fuel Scored", visible: true, numeric: true },
-        "rawValues.totalFuelPassed": { label: "Fuel Passed", visible: false, numeric: true },
+        "rawValues.totalFuelFerried": { label: "Fuel Ferried", visible: false, numeric: true },
         "statboticsTotalFuel": { label: "Statbotics EPA (Fuel Total)", visible: false, numeric: true },
         "statboticsTotalTower": { label: "Statbotics EPA (Tower Total)", visible: false, numeric: true },
         "coprHubTotalPoints": { label: "TBA COPR (Hub Total)", visible: false, numeric: true },
@@ -400,13 +419,16 @@ export const strategyColumns = {
         "defenseNotEffectiveRate": { label: "Defense No Impact %", visible: false, numeric: true, percentage: true },
         "teleopShotOnTheMoveRate": { label: "Teleop Shot On Move %", visible: true, numeric: true, percentage: true },
         "teleopShotStationaryRate": { label: "Teleop Shot Stationary %", visible: true, numeric: true, percentage: true },
-        "rawValues.teleopFuelPassed": { label: "Teleop Passed", visible: false, numeric: true },
+        "rawValues.teleopFuelFerried": { label: "Teleop Ferried", visible: false, numeric: true },
         "teleop.defenseRate": { label: "Defense %", visible: false, numeric: true, percentage: true },
         "endgame.usedTrenchInTeleopRate": { label: "Used Trench %", visible: false, numeric: true, percentage: true },
         "endgame.usedBumpInTeleopRate": { label: "Used Bump %", visible: false, numeric: true, percentage: true },
-        "endgame.passedToAllianceFromNeutralRate": { label: "Passed Neutral → Alliance %", visible: false, numeric: true, percentage: true },
-        "endgame.passedToAllianceFromOpponentRate": { label: "Passed Opponent → Alliance %", visible: false, numeric: true, percentage: true },
-        "endgame.passedToNeutralRate": { label: "Passed Opponent → Neutral %", visible: false, numeric: true, percentage: true },
+        "endgame.ferriedToAllianceFromNeutralRate": { label: "Ferried Neutral → Alliance %", visible: false, numeric: true, percentage: true },
+        "endgame.ferriedToAllianceFromOpponentRate": { label: "Ferried Opponent → Alliance %", visible: false, numeric: true, percentage: true },
+        "endgame.ferriedToNeutralRate": { label: "Ferried Opponent → Neutral %", visible: false, numeric: true, percentage: true },
+        "teleop.ferryOnTheMoveRate": { label: "Ferry On Move %", visible: false, numeric: true, percentage: true },
+        "teleop.ferryStationaryRate": { label: "Ferry Stationary %", visible: false, numeric: true, percentage: true },
+        "teleop.beachedRate": { label: "Beached %", visible: false, numeric: true, percentage: true },
         "rawValues.teleopTrenchStuckDuration": { label: "Trench Stuck (s)", visible: true, numeric: true },
         "rawValues.teleopBumpStuckDuration": { label: "Bump Stuck (s)", visible: true, numeric: true },
     },
@@ -434,7 +456,7 @@ export const strategyColumns = {
 export const strategyPresets: Record<string, string[]> = {
     essential: ["teamNumber", "matchCount", "rawValues.totalPoints", "rawValues.scaledTotalFuel", "fuelTotalOPR", "endgame.climbSuccessRate"],
     auto: ["teamNumber", "matchCount", "rawValues.autoPoints", "rawValues.autoFuel", "rawValues.scaledAutoFuel", "fuelAutoOPR", "autoShotOnTheMoveRate", "autoShotStationaryRate", "autoClimbRate", "autoClimbAttempts", "autoClimbFromSideRate", "autoClimbFromMiddleRate", "rawValues.autoClimbStartTimeSec"],
-    teleop: ["teamNumber", "matchCount", "rawValues.teleopPoints", "rawValues.teleopFuel", "rawValues.scaledTeleopFuel", "fuelTeleopOPR", "defenseEffectivenessScore", "teleopShotOnTheMoveRate", "teleopShotStationaryRate", "rawValues.teleopFuelPassed", "endgame.usedTrenchInTeleopRate", "endgame.usedBumpInTeleopRate", "endgame.passedToAllianceFromNeutralRate", "endgame.passedToAllianceFromOpponentRate", "endgame.passedToNeutralRate"],
+    teleop: ["teamNumber", "matchCount", "rawValues.teleopPoints", "rawValues.teleopFuel", "rawValues.scaledTeleopFuel", "fuelTeleopOPR", "defenseEffectivenessScore", "teleopShotOnTheMoveRate", "teleopShotStationaryRate", "rawValues.teleopFuelFerried", "teleop.ferryOnTheMoveRate", "teleop.ferryStationaryRate", "endgame.usedTrenchInTeleopRate", "endgame.usedBumpInTeleopRate", "endgame.ferriedToAllianceFromNeutralRate", "endgame.ferriedToAllianceFromOpponentRate", "endgame.ferriedToNeutralRate"],
     endgame: ["teamNumber", "matchCount", "rawValues.endgamePoints", "rawValues.endgameClimbStartTimeSec", "endgame.climbAttempts", "endgame.climbL1Rate", "endgame.climbL1Attempts", "endgame.climbL2Rate", "endgame.climbL2Attempts", "endgame.climbL3Rate", "endgame.climbL3Attempts", "endgame.climbFromSideRate", "endgame.climbFromMiddleRate"],
     basic: ["teamNumber", "eventKey", "matchCount"],
 };

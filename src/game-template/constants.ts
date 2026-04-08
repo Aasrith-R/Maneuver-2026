@@ -14,13 +14,13 @@ const MILLISECONDS_PER_SECOND = 1000;
 // Re-export point values derived from schema
 export const AUTO_POINTS = {
     FUEL_SCORED: actions.fuelScored.points.auto ?? 0,
-    FUEL_PASSED: actions.fuelPassed.points.auto ?? 0,
+    FUEL_FERRIED: actions.fuelFerried.points.auto ?? 0,
     AUTO_CLIMB_L1: actions.autoClimb.points.auto ?? 0,
 } as const;
 
 export const TELEOP_POINTS = {
     FUEL_SCORED: actions.fuelScored.points.teleop ?? 0,
-    FUEL_PASSED: actions.fuelPassed.points.teleop ?? 0,
+    FUEL_FERRIED: actions.fuelFerried.points.teleop ?? 0,
 } as const;
 
 export const ENDGAME_POINTS = {

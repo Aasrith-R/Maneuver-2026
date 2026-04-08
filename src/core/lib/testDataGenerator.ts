@@ -5,6 +5,7 @@ import {
 import { actions, toggles } from '@/game-template/game-schema';
 import type { Scout, MatchPrediction } from '@/core/types/gamification';
 import type { ScoutingEntryBase } from '@/core/types/scouting-entry';
+import { proxyGetJson } from '@/core/lib/apiProxy';
 
 /**
  * Agnostic Test Data Generator
@@ -217,14 +218,10 @@ export const generateTBAAlignedScoutingData = async (matchCount: number = 10): P
     }
 
     try {
-        // Fetch TBA matches for the event
-        const response = await fetch(`/.netlify/functions/api-proxy?provider=tba&endpoint=${encodeURIComponent(`/event/${eventKey}/matches`)}`);
-
-        if (!response.ok) {
-            return { success: false, message: `TBA API error: ${response.status}`, matchesGenerated: 0 };
+        const allMatches = await proxyGetJson<unknown>('tba', `/event/${eventKey}/matches`);
+        if (!Array.isArray(allMatches)) {
+            return { success: false, message: 'Unexpected response when loading matches.', matchesGenerated: 0 };
         }
-
-        const allMatches = await response.json();
 
         // Filter to qualification matches with score breakdowns, limit to matchCount
         const matches = allMatches

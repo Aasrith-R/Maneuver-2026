@@ -76,7 +76,7 @@ export const calculateTeamStats = (teamMatches: ScoutingEntry[]): Omit<TeamStats
     );
 
     const autoFuelPassedTotal = sum(teamMatches, m =>
-        val(m.gameData?.auto?.fuelPassedCount)
+        val(m.gameData?.auto?.fuelFerriedCount ?? m.gameData?.auto?.fuelPassedCount)
     );
 
     // Teleop fuel
@@ -85,7 +85,7 @@ export const calculateTeamStats = (teamMatches: ScoutingEntry[]): Omit<TeamStats
     );
 
     const teleopFuelPassedTotal = sum(teamMatches, m =>
-        val(m.gameData?.teleop?.fuelPassedCount)
+        val(m.gameData?.teleop?.fuelFerriedCount ?? m.gameData?.teleop?.fuelPassedCount)
     );
 
     // Total fuel
@@ -393,10 +393,11 @@ export const calculateTeamStats = (teamMatches: ScoutingEntry[]): Omit<TeamStats
         totalFuel: teamMatches.map(m =>
             val(m.gameData?.auto?.fuelScoredCount) + val(m.gameData?.teleop?.fuelScoredCount)
         ),
-        autoFuelPassed: teamMatches.map(m => val(m.gameData?.auto?.fuelPassedCount)),
-        teleopFuelPassed: teamMatches.map(m => val(m.gameData?.teleop?.fuelPassedCount)),
+        autoFuelPassed: teamMatches.map(m => val(m.gameData?.auto?.fuelFerriedCount ?? m.gameData?.auto?.fuelPassedCount)),
+        teleopFuelPassed: teamMatches.map(m => val(m.gameData?.teleop?.fuelFerriedCount ?? m.gameData?.teleop?.fuelPassedCount)),
         totalFuelPassed: teamMatches.map(m =>
-            val(m.gameData?.auto?.fuelPassedCount) + val(m.gameData?.teleop?.fuelPassedCount)
+            val(m.gameData?.auto?.fuelFerriedCount ?? m.gameData?.auto?.fuelPassedCount) +
+            val(m.gameData?.teleop?.fuelFerriedCount ?? m.gameData?.teleop?.fuelPassedCount)
         ),
         scaledAutoFuel: teamMatches.map(m => {
             const scaledMetrics = m.gameData?.scaledMetrics as { scaledAutoFuel?: number } | undefined;

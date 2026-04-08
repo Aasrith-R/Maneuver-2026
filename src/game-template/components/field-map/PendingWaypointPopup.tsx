@@ -356,8 +356,7 @@ export function PendingWaypointPopup({
                         <Badge variant="outline" className={cn(
                             "font-bold px-2 py-0.5 shrink-0",
                             pendingWaypoint.type === 'score' ? "text-green-500 border-green-500/50" :
-                                pendingWaypoint.type === 'climb' ? "text-blue-500 border-blue-500/50" :
-                                    "text-purple-500 border-purple-500/50"
+                                "text-purple-500 border-purple-500/50"
                         )}>
                             {pendingWaypoint.type.toUpperCase()}
                         </Badge>
@@ -437,7 +436,7 @@ export function PendingWaypointPopup({
                                 <Button
                                     variant={pendingClimbLocation === 'side' ? 'default' : 'outline'}
                                     onClick={() => setPendingClimbLocation('side')}
-                                    className="h-16 flex flex-col gap-1 items-center justify-center border-2 transition-all rounded-xl hover:bg-blue-500/20 hover:border-blue-400"
+                                    className="h-16 flex flex-col gap-1 items-center justify-center border-2 transition-all rounded-xl hover:bg-purple-500/20 hover:border-purple-400"
                                 >
                                     <span className="inline-flex items-center gap-1.5 font-bold text-lg">
                                         <Kbd className="h-5 px-1.5 text-[10px]">A</Kbd>
@@ -447,7 +446,7 @@ export function PendingWaypointPopup({
                                 <Button
                                     variant={pendingClimbLocation === 'middle' ? 'default' : 'outline'}
                                     onClick={() => setPendingClimbLocation('middle')}
-                                    className="h-16 flex flex-col gap-1 items-center justify-center border-2 transition-all rounded-xl hover:bg-blue-500/20 hover:border-blue-400"
+                                    className="h-16 flex flex-col gap-1 items-center justify-center border-2 transition-all rounded-xl hover:bg-purple-500/20 hover:border-purple-400"
                                 >
                                     <span className="inline-flex items-center gap-1.5 font-bold text-lg">
                                         <Kbd className="h-5 px-1.5 text-[10px]">F</Kbd>
@@ -463,7 +462,7 @@ export function PendingWaypointPopup({
                                         key={level}
                                         variant={pendingClimbLevel === level ? 'default' : 'outline'}
                                         onClick={() => setPendingClimbLevel(level)}
-                                        className="h-16 flex flex-col gap-1 items-center justify-center border-2 transition-all rounded-xl hover:bg-blue-500/20 hover:border-blue-400"
+                                        className="h-16 flex flex-col gap-1 items-center justify-center border-2 transition-all rounded-xl hover:bg-purple-500/20 hover:border-purple-400"
                                     >
                                         <span className="inline-flex items-center gap-1.5 font-bold text-lg">
                                             <Kbd className="h-5 px-1.5 text-[10px]">{level === 1 ? 'A' : level === 2 ? 'S' : 'D'}</Kbd>
@@ -483,7 +482,7 @@ export function PendingWaypointPopup({
                                     onClick={() => onClimbResultSelect('success')}
                                     className={cn(
                                         "h-20 flex flex-col gap-1 items-center justify-center border-2 transition-all rounded-xl",
-                                        climbResult === 'success' && "bg-blue-600 hover:bg-blue-700 border-blue-400 text-white shadow-lg"
+                                        climbResult === 'success' && "bg-purple-600 hover:bg-purple-700 border-purple-400 text-white shadow-lg"
                                     )}
                                 >
                                     <Check className="h-6 w-6 font-bold" />
@@ -640,7 +639,12 @@ export function PendingWaypointPopup({
                                 onConfirm(climbStartTimeSecRemaining);
                             }}
                             disabled={!canConfirm}
-                            className="h-12 w-12 rounded-full border-2 bg-green-600 hover:bg-green-500"
+                            className={cn(
+                                "h-12 w-12 rounded-full border-2",
+                                (pendingWaypoint.type === 'ferry' || pendingWaypoint.type === 'climb')
+                                    ? "bg-purple-600 hover:bg-purple-500"
+                                    : "bg-green-600 hover:bg-green-500"
+                            )}
                         >
                             <Check className="h-6 w-6" />
                         </Button>

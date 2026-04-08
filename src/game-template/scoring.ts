@@ -33,7 +33,7 @@ export interface GameData {
         // Note: alliance is stored at top-level scoutingEntry.allianceColor
         // Fuel counters
         fuelScoredCount?: number;
-        fuelPassedCount?: number;
+        fuelFerriedCount?: number;
         // Collection counters by location
         depotCollectCount?: number;
         outpostCollectCount?: number;
@@ -61,7 +61,12 @@ export interface GameData {
     teleop: {
         // Fuel counters
         fuelScoredCount?: number;
-        fuelPassedCount?: number;
+        fuelFerriedCount?: number;
+        // Ferry tracking
+        ferryOnTheMoveCount?: number;
+        ferryStationaryCount?: number;
+        // Beached tracking
+        beachedCount?: number;
         // Action counters
         stealCount?: number;
         // Stuck counters
@@ -90,22 +95,25 @@ export interface GameData {
         
         // Active Phase Roles (multi-select)
         roleActiveCleanUp?: boolean;
-        roleActivePasser?: boolean;
+        roleActiveFerrier?: boolean;
         roleActiveDefense?: boolean;
         roleActiveCycler?: boolean;
         roleActiveThief?: boolean;
-        
+
         // Inactive Phase Roles (multi-select)
         roleInactiveCleanUp?: boolean;
-        roleInactivePasser?: boolean;
+        roleInactiveFerrier?: boolean;
         roleInactiveDefense?: boolean;
         roleInactiveCycler?: boolean;
         roleInactiveThief?: boolean;
-        
-        // Passing zones (multi-select)
-        passedToAllianceFromNeutral?: boolean;
-        passedToAllianceFromOpponent?: boolean;
-        passedToNeutral?: boolean;
+
+        // Ferrying zones (multi-select)
+        ferriedToAllianceFromNeutral?: boolean;
+        ferriedToAllianceFromOpponent?: boolean;
+        ferriedToNeutral?: boolean;
+
+        // Climb duration
+        climbDurationSec?: number;
 
         // Teleop traversal confirmation (post-match)
         usedTrenchInTeleop?: boolean;

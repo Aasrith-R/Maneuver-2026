@@ -12,13 +12,15 @@ export type PathActionType =
     | 'traversal'  // Moving between zones (trench/bump)
     | 'score'      // Scoring at hub (free-form position)
     | 'collect'    // Collecting from depot/outpost
-    | 'pass'       // Passing to Alliance zone
+    | 'ferry'      // Ferrying to Alliance zone
     | 'climb'      // Climb attempt
     | 'foul'       // Mid-line foul or other penalty
     | 'defense'    // Defense action (Teleop)
     | 'stuck'      // Robot stuck on obstacle (Teleop)
     | 'unstuck'    // Robot freed from obstacle (Teleop)
     | 'steal'      // Stealing fuel (Teleop)
+    | 'beached'    // Robot beached/stuck in neutral zone
+    | 'unbeached'  // Robot freed from beached state
     | 'broken-down'; // Robot broken down
 
 export type ZoneType = 'allianceZone' | 'neutralZone' | 'opponentZone';
@@ -27,6 +29,7 @@ export type ClimbLevel = 1 | 2 | 3;
 export type ClimbResult = 'success' | 'fail';
 export type ClimbLocation = 'side' | 'middle';
 export type ShotType = 'onTheMove' | 'stationary';
+export type FerryType = 'onTheMove' | 'stationary';
 export type DefenseEffectiveness = 'very' | 'somewhat' | 'not';
 
 // =============================================================================
@@ -48,7 +51,11 @@ export interface PathWaypoint {
     climbResult?: ClimbResult;
     climbLocation?: ClimbLocation;
     shotType?: ShotType;
+    ferryType?: FerryType;
+    ferryStartZone?: ZoneType;
+    ferryLandZone?: ZoneType;
     climbStartTimeSecRemaining?: number | null;
+    climbDurationSec?: number; // How long the climb took in seconds
     duration?: number; // For stuck events (ms)
     obstacleType?: 'bump' | 'trench'; // For stuck events
     defendedTeamNumber?: number;
@@ -85,23 +92,14 @@ export interface FieldMapContainerProps {
 export interface FieldCanvasProps {
     actions: PathWaypoint[];
     pendingWaypoint?: PathWaypoint | null;
-    drawingPoints?: { x: number; y: number }[];
     alliance: 'red' | 'blue';
     isFieldRotated?: boolean;
     width: number;
     height: number;
-    isSelectingScore?: boolean;
-    isSelectingPass?: boolean;
-    isSelectingCollect?: boolean;
     /** If true, draw connecting lines between waypoints (for Auto). If false, only standalone paths (for Teleop). Default: true */
     drawConnectedPaths?: boolean;
-    /** Optional zone bounds to show as visual boundary indicator when drawing */
-    drawingZoneBounds?: { xMin: number; xMax: number; yMin: number; yMax: number };
     /** Optional replay progress (0-1) for progressive path drawing. If omitted, paths render fully. */
     replayDrawProgress?: number;
-    onPointerDown?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
-    onPointerMove?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
-    onPointerUp?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
 }
 
 export interface FieldButtonProps {
@@ -136,7 +134,7 @@ export interface FuelSelectorProps {
     onCancel: () => void;
     accumulatedFuel: number;
     isLarge?: boolean;
-    type?: 'score' | 'pass' | 'collect';
+    type?: 'score' | 'ferry' | 'collect';
 }
 
 export interface ClimbSelectorProps {

@@ -288,9 +288,11 @@ export const strategyAnalysis: StrategyAnalysis<ScoutingEntryTemplate> = {
             acc.teleopFuel += rawTeleopFuel;
             acc.scaledAutoFuel += scaledAutoFuel;
             acc.scaledTeleopFuel += scaledTeleopFuel;
-            acc.autoFuelPassed += gameData?.auto?.fuelPassedCount || 0;
-            acc.teleopFuelPassed += gameData?.teleop?.fuelPassedCount || 0;
-            acc.fuelPassed += (gameData?.auto?.fuelPassedCount || 0) + (gameData?.teleop?.fuelPassedCount || 0);
+            const autoFuelPassed = Number(gameData?.auto?.fuelFerriedCount ?? gameData?.auto?.fuelPassedCount ?? 0);
+            const teleopFuelPassed = Number(gameData?.teleop?.fuelFerriedCount ?? gameData?.teleop?.fuelPassedCount ?? 0);
+            acc.autoFuelPassed += autoFuelPassed;
+            acc.teleopFuelPassed += teleopFuelPassed;
+            acc.fuelPassed += autoFuelPassed + teleopFuelPassed;
 
             // Toggles
             acc.mobility += gameData?.auto?.leftStartZone ? 1 : 0;
@@ -436,9 +438,10 @@ export const strategyAnalysis: StrategyAnalysis<ScoutingEntryTemplate> = {
                 comment: entry.comments || '',
                 autoFuel: entry.gameData?.auto?.fuelScoredCount || 0,
                 teleopFuel: entry.gameData?.teleop?.fuelScoredCount || 0,
-                fuelPassed: (entry.gameData?.auto?.fuelPassedCount || 0) + (entry.gameData?.teleop?.fuelPassedCount || 0),
-                autoFuelPassed: entry.gameData?.auto?.fuelPassedCount || 0,
-                teleopFuelPassed: entry.gameData?.teleop?.fuelPassedCount || 0,
+                fuelPassed: Number(entry.gameData?.auto?.fuelFerriedCount ?? entry.gameData?.auto?.fuelPassedCount ?? 0)
+                    + Number(entry.gameData?.teleop?.fuelFerriedCount ?? entry.gameData?.teleop?.fuelPassedCount ?? 0),
+                autoFuelPassed: Number(entry.gameData?.auto?.fuelFerriedCount ?? entry.gameData?.auto?.fuelPassedCount ?? 0),
+                teleopFuelPassed: Number(entry.gameData?.teleop?.fuelFerriedCount ?? entry.gameData?.teleop?.fuelPassedCount ?? 0),
                 autoPath: Array.isArray(entry.gameData?.auto?.autoPath) 
                     ? entry.gameData.auto.autoPath.filter((wp: any) => wp && wp.position) 
                     : (Array.isArray(entry.gameData?.auto?.actions) ? entry.gameData.auto.actions.filter((wp: any) => wp && wp.position) : []),

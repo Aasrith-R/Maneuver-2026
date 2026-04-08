@@ -5,7 +5,7 @@
  * Renders path lines, waypoint markers, labels, and in-progress drawing.
  */
 
-import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, forwardRef, useImperativeHandle, type PointerEventHandler } from 'react';
 import type { PathWaypoint, FieldCanvasProps } from './types';
 
 // =============================================================================
@@ -16,7 +16,7 @@ const COLORS = {
     red: '#ef4444',
     blue: '#3b82f6',
     score: '#22c55e',
-    pass: '#9333ea',
+    ferry: '#9333ea',
     collect: '#eab308',
     climb: '#a855f7',
     traversal: '#06b6d4',
@@ -55,27 +55,31 @@ export interface FieldCanvasRef {
     canvas: HTMLCanvasElement | null;
 }
 
-export const FieldCanvas = forwardRef<FieldCanvasRef, FieldCanvasProps>(function FieldCanvas(
-    {
+type FieldCanvasLegacyDrawingProps = {
+    isSelectingPass?: boolean;
+    isSelectingScore?: boolean;
+    isSelectingCollect?: boolean;
+    drawingPoints?: { x: number; y: number }[];
+    drawingZoneBounds?: { xMin: number; xMax: number; yMin: number; yMax: number };
+    onPointerDown?: PointerEventHandler<HTMLCanvasElement>;
+    onPointerMove?: PointerEventHandler<HTMLCanvasElement>;
+    onPointerUp?: PointerEventHandler<HTMLCanvasElement>;
+};
+
+export const FieldCanvas = forwardRef<FieldCanvasRef, FieldCanvasProps & FieldCanvasLegacyDrawingProps>(function FieldCanvas(
+    props,
+    ref
+) {
+    const {
         actions,
         pendingWaypoint,
-        drawingPoints = [],
         alliance,
         isFieldRotated = false,
         width,
         height,
-        isSelectingScore = false,
-        isSelectingPass = false,
-        isSelectingCollect = false,
         drawConnectedPaths = true,
-        drawingZoneBounds,
         replayDrawProgress,
-        onPointerDown,
-        onPointerMove,
-        onPointerUp,
-    },
-    ref
-) {
+    } = props;
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useImperativeHandle(ref, () => ({
@@ -93,7 +97,8 @@ export const FieldCanvas = forwardRef<FieldCanvasRef, FieldCanvasProps>(function
             case 'collect': return COLORS.collect;
             case 'climb': return COLORS.climb;
             case 'traversal': return COLORS.traversal;
-            case 'pass': return COLORS.pass;
+            case 'ferry': return COLORS.ferry;
+            case 'beached': return COLORS.amber;
             case 'foul': return COLORS.foul;
             default: return COLORS.default;
         }
@@ -103,7 +108,7 @@ export const FieldCanvas = forwardRef<FieldCanvasRef, FieldCanvasProps>(function
         switch (type) {
             case 'score': return hexToRgba(COLORS.score, PATH_LINE_ALPHA);
             case 'collect': return hexToRgba(COLORS.collect, PATH_LINE_ALPHA);
-            case 'pass': return hexToRgba(COLORS.pass, PATH_LINE_ALPHA);
+            case 'ferry': return hexToRgba(COLORS.ferry, PATH_LINE_ALPHA);
             default: return getWaypointColor(type);
         }
     };
@@ -200,7 +205,7 @@ export const FieldCanvas = forwardRef<FieldCanvasRef, FieldCanvasProps>(function
             ctx.setLineDash([]);
 
             const shouldUsePathBorder = (type: PathWaypoint['type']): boolean => (
-                type === 'score' || type === 'pass' || type === 'collect'
+                type === 'score' || type === 'ferry' || type === 'collect'
             );
 
             const replaySegments: Array<{
@@ -291,72 +296,6 @@ export const FieldCanvas = forwardRef<FieldCanvasRef, FieldCanvasProps>(function
             });
         }
 
-        // Draw zone boundary outline when in drawing mode
-        if (drawingZoneBounds && (isSelectingScore || isSelectingPass || isSelectingCollect)) {
-            const zoneColor = isSelectingScore ? COLORS.score : isSelectingPass ? COLORS.pass : COLORS.collect;
-
-            // Transform zone bounds for alliance mirroring
-            const visualXMin = getVisualX(drawingZoneBounds.xMin);
-            const visualXMax = getVisualX(drawingZoneBounds.xMax);
-            const visualYMin = getVisualY(drawingZoneBounds.yMin);
-            const visualYMax = getVisualY(drawingZoneBounds.yMax);
-
-            // Ensure min/max are correct after mirroring
-            const xMin = Math.min(visualXMin, visualXMax);
-            const xMax = Math.max(visualXMin, visualXMax);
-            const yMin = Math.min(visualYMin, visualYMax);
-            const yMax = Math.max(visualYMin, visualYMax);
-
-            const zoneX = xMin * canvas.width;
-            const zoneY = yMin * canvas.height;
-            const zoneW = (xMax - xMin) * canvas.width;
-            const zoneH = (yMax - yMin) * canvas.height;
-
-            // Draw semi-transparent fill
-            ctx.fillStyle = zoneColor;
-            ctx.globalAlpha = 0.1;
-            ctx.fillRect(zoneX, zoneY, zoneW, zoneH);
-
-            // Draw dashed border
-            ctx.beginPath();
-            ctx.strokeStyle = zoneColor;
-            ctx.lineWidth = Math.max(2, 3 * scaleFactor);
-            ctx.setLineDash([8 * scaleFactor, 4 * scaleFactor]);
-            ctx.globalAlpha = 0.8;
-            ctx.rect(zoneX, zoneY, zoneW, zoneH);
-            ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.globalAlpha = 1.0;
-        }
-
-        // Draw temporary path being drawn
-        if (drawingPoints.length > 1) {
-            ctx.beginPath();
-
-            // Determine color based on current mode
-            let color = COLORS.amber;
-            if (isSelectingScore) color = COLORS.score;
-            else if (isSelectingPass) color = COLORS.pass;
-            else if (isSelectingCollect) color = COLORS.collect;
-
-            ctx.strokeStyle = color;
-            ctx.lineWidth = Math.max(2, 4 * scaleFactor);
-            ctx.setLineDash([5 * scaleFactor, 5 * scaleFactor]); // Dashed for temp
-
-            const start = drawingPoints[0];
-            if (start) {
-                ctx.moveTo(getVisualX(start.x) * canvas.width, getVisualY(start.y) * canvas.height);
-                for (let i = 1; i < drawingPoints.length; i++) {
-                    const pt = drawingPoints[i];
-                    if (pt) {
-                        ctx.lineTo(getVisualX(pt.x) * canvas.width, getVisualY(pt.y) * canvas.height);
-                    }
-                }
-                ctx.stroke();
-            }
-            ctx.setLineDash([]);
-        }
-
         const markerRadius = Math.max(8, 12 * scaleFactor);
         const markerFont = `bold ${Math.max(8, 11 * scaleFactor)}px sans-serif`;
         const labelFont = `bold ${Math.max(7, 10 * scaleFactor)}px sans-serif`;
@@ -439,7 +378,7 @@ export const FieldCanvas = forwardRef<FieldCanvasRef, FieldCanvasProps>(function
         if (pendingWaypoint) {
             const x = getVisualX(pendingWaypoint.position.x) * canvas.width;
             const y = getVisualY(pendingWaypoint.position.y) * canvas.height;
-            const color = pendingWaypoint.type === 'score' ? COLORS.score : COLORS.pass;
+            const color = getWaypointColor(pendingWaypoint.type);
 
             ctx.save();
             ctx.globalAlpha = 0.6;
@@ -476,7 +415,7 @@ export const FieldCanvas = forwardRef<FieldCanvasRef, FieldCanvasProps>(function
             ctx.restore();
         }
 
-    }, [actions, width, height, alliance, drawingPoints, pendingWaypoint, isFieldRotated, isSelectingScore, isSelectingPass, isSelectingCollect, drawConnectedPaths, drawingZoneBounds, replayDrawProgress]);
+    }, [actions, width, height, alliance, pendingWaypoint, isFieldRotated, drawConnectedPaths, replayDrawProgress]);
 
     return (
         <canvas
@@ -485,9 +424,6 @@ export const FieldCanvas = forwardRef<FieldCanvasRef, FieldCanvasProps>(function
             height={height}
             className="absolute inset-0 w-full h-full pointer-events-auto touch-none"
             style={{ touchAction: 'none' }}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
         />
     );
 });

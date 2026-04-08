@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { proxyGetJson } from '@/core/lib/apiProxy';
 import {
   type TBAMatch,
   type TBATeam,
@@ -33,26 +34,15 @@ export const useTBAData = () => {
     setMatchDataLoading(true);
 
     try {
-      const headers = {
-        ...(tbaApiKey.trim() ? { "X-Client-Api-Key": tbaApiKey } : {}),
-      };
-
-      const res = await fetch(
-        `/.netlify/functions/api-proxy?provider=tba&endpoint=${encodeURIComponent(`/event/${tbaEventKey}/matches/simple`)}`,
-        { headers }
+      const fullData = await proxyGetJson<unknown>(
+        'tba',
+        `/event/${tbaEventKey.trim()}/matches/simple`,
+        { apiKeyOverride: tbaApiKey.trim() ? tbaApiKey.trim() : undefined }
       );
 
-      if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error("Invalid API key. Please check your TBA API key.");
-        } else if (res.status === 404) {
-          throw new Error("Event not found. Please check the event key.");
-        } else {
-          throw new Error(`API request failed with status ${res.status}`);
-        }
+      if (!Array.isArray(fullData)) {
+        throw new Error('Unexpected response when loading matches.');
       }
-
-      const fullData = await res.json();
 
       const qualMatchesCleaned = [];
 
@@ -105,8 +95,13 @@ export const useTBAData = () => {
         sessionStorage.removeItem("tbaApiKey");
       }
     } catch (err) {
-      toast.error("Failed to fetch match data from TBA");
-      console.error(err);
+      const message = err instanceof Error ? err.message : 'Failed to fetch match data from TBA';
+      const netlifyHint =
+        import.meta.env.DEV && typeof window !== 'undefined' && window.location.port === '5173'
+          ? ' (Run `npm run dev` and open http://localhost:8888 so Netlify Functions are available.)'
+          : '';
+      toast.error(`${message}${netlifyHint}`);
+      console.error('fetchMatchDataFromTBA error', err);
     } finally {
       setMatchDataLoading(false);
     }
@@ -120,19 +115,11 @@ export const useTBAData = () => {
 
     setMatchResultsLoading(true);
     try {
-      const headers = {
-        ...(tbaApiKey.trim() ? { "X-Client-Api-Key": tbaApiKey } : {}),
-      };
-      const response = await fetch(
-        `/.netlify/functions/api-proxy?provider=tba&endpoint=${encodeURIComponent(`/event/${tbaEventKey.trim()}/matches/simple`)}`,
-        { headers }
+      const fullData = await proxyGetJson<TBAMatch[]>(
+        'tba',
+        `/event/${tbaEventKey.trim()}/matches/simple`,
+        { apiKeyOverride: tbaApiKey.trim() ? tbaApiKey.trim() : undefined }
       );
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
-      }
-
-      const fullData = await response.json();
 
       // Filter for qualification matches
       const qualMatches = fullData.filter((match: TBAMatch) => match.comp_level === "qm");
@@ -163,7 +150,12 @@ export const useTBAData = () => {
       }
     } catch (error) {
       console.error('Error loading matches:', error);
-      toast.error('Failed to load matches. Check the event key and API key.');
+      const message = error instanceof Error ? error.message : 'Failed to load matches.';
+      const netlifyHint =
+        import.meta.env.DEV && typeof window !== 'undefined' && window.location.port === '5173'
+          ? ' (Run `npm run dev` and open http://localhost:8888 so Netlify Functions are available.)'
+          : '';
+      toast.error(`${message}${netlifyHint}`);
       setMatches([]);
     } finally {
       setMatchResultsLoading(false);

@@ -2,19 +2,16 @@
  * Teleop Field Map Component
  * 
  * Field-based scoring interface for Teleop period.
- * Uses zone overlays for manual zone selection with shoot/pass paths.
+ * Uses zone overlays for manual zone selection with shoot/ferry paths.
  * 
  * Key differences from Auto:
- * - No connected movement path - only shoot/pass paths are standalone
+ * - No connected movement path - only shoot/ferry paths are standalone
  * - Zone selection via overlay tap (not traversal actions)
  * - Climb includes level selection (L1/L2/L3) + success/fail
- * - Defense and Steal actions in opponent zone
+ * - Defense and Ferry actions in-field
  */
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Button } from '@/core/components/ui/button';
-import { Badge } from '@/core/components/ui/badge';
-import { Card } from '@/core/components/ui/card';
+import { useState, useCallback, useEffect } from 'react';
 import { cn } from '@/core/lib/utils';
 import { loadPitScoutingByTeamAndEvent } from '@/core/db/database';
 
@@ -29,17 +26,16 @@ import {
     type ZoneType,
 
     FIELD_ELEMENTS,
-    ZONE_BOUNDS,
-    usePathDrawing,
     FieldCanvas,
     FieldButton,
     FieldHeader,
     getVisibleElements,
     ZoneOverlay,
     PendingWaypointPopup,
-    ShotTypePopup,
     DefensePopup,
 } from '../field-map';
+import { FerryTypePopup } from '../field-map/FerryTypePopup';
+
 
 // Context hooks
 import { TeleopPathProvider, useTeleopScoring } from '@/game-template/contexts';
@@ -71,23 +67,6 @@ export interface TeleopFieldMapProps {
     onBack?: () => void;
     onProceed?: (finalActions?: PathWaypoint[]) => void;
 }
-
-const MOVING_SHOT_MIN_PATH_LENGTH = 0.05;
-
-const getPathLength = (points: { x: number; y: number }[]): number => {
-    if (points.length < 2) return 0;
-
-    let length = 0;
-    for (let index = 1; index < points.length; index += 1) {
-        const previous = points[index - 1]!;
-        const current = points[index]!;
-        const deltaX = current.x - previous.x;
-        const deltaY = current.y - previous.y;
-        length += Math.hypot(deltaX, deltaY);
-    }
-
-    return length;
-};
 
 // =============================================================================
 // WRAPPER COMPONENT - Provides Context
@@ -163,36 +142,25 @@ function TeleopFieldMapContent({
         setShowPostClimbProceed,
         canvasDimensions,
         containerRef,
-        isSelectingScore,
-        setIsSelectingScore,
-        isSelectingPass,
-        setIsSelectingPass,
     } = useTeleopScoring();
-
-    const fieldCanvasRef = useRef<{ canvas: HTMLCanvasElement | null }>({ canvas: null });
-
-    // Create a ref-like object for usePathDrawing that accesses the canvas element
-    const canvasRef = useMemo(() => ({
-        get current() { return fieldCanvasRef.current?.canvas ?? null; }
-    }), []) as React.RefObject<HTMLCanvasElement>;
 
     const isMobile = useIsMobile();
     const effectiveScoutOptions = getEffectiveScoutOptions(scoutOptions);
     const disableHubFuelScoringPopup =
         effectiveScoutOptions[GAME_SCOUT_OPTION_KEYS.disableHubFuelScoringPopup] === true;
-    const disablePassingPopup =
-        effectiveScoutOptions[GAME_SCOUT_OPTION_KEYS.disablePassingPopup] === true;
     const disableDefensePopup =
         effectiveScoutOptions[GAME_SCOUT_OPTION_KEYS.disableDefensePopup] === true;
-    const disablePathDrawingTapOnly =
-        effectiveScoutOptions[GAME_SCOUT_OPTION_KEYS.disableTeleopPathDrawingTapOnly] === true;
 
     // Local state (UI-only)
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [robotCapacity, setRobotCapacity] = useState<number | undefined>();
     const [actionLogOpen, setActionLogOpen] = useState(false);
-    const [pendingShotTypeWaypoint, setPendingShotTypeWaypoint] = useState<PathWaypoint | null>(null);
+    type FerryFlowStep = 'start-zone' | 'land-zone' | 'ferry-type' | 'fuel';
+    const [ferryFlowStep, setFerryFlowStep] = useState<FerryFlowStep | null>(null);
+    const [pendingFerry, setPendingFerry] = useState<PathWaypoint | null>(null);
     const [focusClimbTimeInputOnOpen, setFocusClimbTimeInputOnOpen] = useState(false);
+    const [climbStartTime, setClimbStartTime] = useState<number | null>(null);
+    const [beachedStart, setBeachedStart] = useState<number | null>(null);
     const [isDefenseTargetDialogOpen, setIsDefenseTargetDialogOpen] = useState(false);
     const [isDefenseEffectivenessDialogOpen, setIsDefenseEffectivenessDialogOpen] = useState(false);
     const [pendingDefenseZone, setPendingDefenseZone] = useState<ZoneType | null>(null);
@@ -241,22 +209,12 @@ function TeleopFieldMapContent({
         }
     }, [pendingWaypoint, resetFuel]);
 
-    // Path drawing hook - constrain to active zone bounds
-    const currentZoneBounds = activeZone ? ZONE_BOUNDS[activeZone] : undefined;
-    const {
-        drawingPoints,
-        handleDrawStart,
-        handleDrawMove,
-        handleDrawEnd,
-        resetDrawing,
-    } = usePathDrawing({
-        canvasRef,
-        isFieldRotated,
-        alliance,
-        isEnabled: isSelectingScore || isSelectingPass,
-        onDrawComplete: (points) => handleDrawComplete(points),
-        zoneBounds: currentZoneBounds,
-    });
+    const cancelFerryFlow = useCallback(() => {
+        setPendingFerry(null);
+        setFerryFlowStep(null);
+        setAccumulatedFuel(0);
+        setFuelHistory([]);
+    }, [setAccumulatedFuel, setFuelHistory]);
 
     // Auto-fullscreen on mobile
     useEffect(() => {
@@ -270,13 +228,12 @@ function TeleopFieldMapContent({
         .filter(a => a.type === 'score')
         .reduce((sum, a) => sum + Math.abs(a.fuelDelta || 0), 0);
 
-    const totalFuelPassed = actions
-        .filter(a => a.type === 'pass')
+    const totalFuelFerried = actions
+        .filter(a => a.type === 'ferry')
         .reduce((sum, a) => sum + Math.abs(a.fuelDelta || 0), 0);
 
-    // Defense and steal counted from actions array like everything else
+    // Defense counted from actions array like everything else
     const totalDefense = actions.filter(a => a.type === 'defense').length;
-    const totalSteal = actions.filter(a => a.type === 'steal').length;
 
     const getOpponentTeamsFromSchedule = useCallback((): string[] => {
         try {
@@ -406,113 +363,17 @@ function TeleopFieldMapContent({
         setActiveZone(zone);
     };
 
-    const handleDrawComplete = useCallback((points: { x: number; y: number }[]) => {
-        if (points.length === 0) return;
-
-        const isDrag = points.length > 5;
-        const shouldUsePath = isDrag && !disablePathDrawingTapOnly;
-        const endPos = points[points.length - 1] || points[0]!;
-
-        if (isSelectingScore) {
-            const inferredShotType = shouldUsePath
-                ? (getPathLength(points) >= MOVING_SHOT_MIN_PATH_LENGTH ? 'onTheMove' : 'stationary')
-                : 'stationary';
-
-            const waypoint: PathWaypoint = {
-                id: generateId(),
-                type: 'score',
-                action: shouldUsePath ? 'shoot-path' : 'hub',
-                position: endPos,
-                fuelDelta: disableHubFuelScoringPopup ? 0 : 0,
-                amountLabel: disableHubFuelScoringPopup ? undefined : '...',
-                timestamp: Date.now(),
-                pathPoints: shouldUsePath ? points : undefined,
-                shotType: inferredShotType,
-                zone: 'allianceZone',
-            };
-            if (disablePathDrawingTapOnly) {
-                setPendingShotTypeWaypoint({
-                    ...waypoint,
-                    action: 'hub',
-                    pathPoints: undefined,
-                });
-                setAccumulatedFuel(0);
-                setFuelHistory([]);
-                setPendingWaypoint(null);
-            } else {
-                if (disableHubFuelScoringPopup) {
-                    onAddAction(waypoint);
-                    setAccumulatedFuel(0);
-                    setFuelHistory([]);
-                    setPendingWaypoint(null);
-                } else {
-                    setAccumulatedFuel(0);
-                    setFuelHistory([]);
-                    setPendingWaypoint(waypoint);
-                }
-            }
-            setIsSelectingScore(false);
-        } else if (isSelectingPass) {
-            const waypoint: PathWaypoint = {
-                id: generateId(),
-                type: 'pass',
-                action: shouldUsePath ? 'pass-path' : 'partner',
-                position: endPos,
-                fuelDelta: 0,
-                amountLabel: disablePassingPopup ? undefined : '...',
-                timestamp: Date.now(),
-                pathPoints: shouldUsePath ? points : undefined,
-                zone: activeZone || 'neutralZone',
-            };
-            if (disablePassingPopup) {
-                onAddAction(waypoint);
-                setAccumulatedFuel(0);
-                setFuelHistory([]);
-                setPendingWaypoint(null);
-            } else {
-                setAccumulatedFuel(0);
-                setFuelHistory([]);
-                setPendingWaypoint(waypoint);
-            }
-            setIsSelectingPass(false);
-        }
-    }, [
-        isSelectingScore,
-        isSelectingPass,
-        activeZone,
-        generateId,
-        setAccumulatedFuel,
-        setFuelHistory,
-        setPendingWaypoint,
-        setIsSelectingScore,
-        setIsSelectingPass,
-        disableHubFuelScoringPopup,
-        disablePassingPopup,
-        disablePathDrawingTapOnly,
-        onAddAction,
-    ]);
-
-    const handleShotTypeSelected = (shotType: 'onTheMove' | 'stationary') => {
-        if (!pendingShotTypeWaypoint) return;
-
-        const scoredWaypoint: PathWaypoint = {
-            ...pendingShotTypeWaypoint,
-            shotType,
-        };
-
-        if (disableHubFuelScoringPopup) {
-            onAddAction(scoredWaypoint);
-            setPendingWaypoint(null);
-        } else {
-            setPendingWaypoint(scoredWaypoint);
-        }
-
-        setPendingShotTypeWaypoint(null);
-    };
-
     const handleElementClick = useCallback((elementKey: string) => {
         // Block if popup active or broken down
-        if (pendingWaypoint || pendingShotTypeWaypoint || isSelectingScore || isSelectingPass || isBrokenDown) return;
+        if (
+            pendingWaypoint ||
+            ferryFlowStep !== null ||
+            isDefenseTargetDialogOpen ||
+            isDefenseEffectivenessDialogOpen ||
+            isBrokenDown
+        ) {
+            return;
+        }
 
         const element = FIELD_ELEMENTS[elementKey];
         if (!element) return;
@@ -566,15 +427,74 @@ function TeleopFieldMapContent({
 
         switch (elementKey) {
             case 'hub':
-                setIsSelectingScore(true);
+                if (disableHubFuelScoringPopup) {
+                    onAddAction({
+                        id: generateId(),
+                        type: 'score',
+                        action: 'hub',
+                        position: { x: element.x, y: element.y },
+                        timestamp: Date.now(),
+                        fuelDelta: 0,
+                        zone: 'allianceZone',
+                    } as any);
+                } else {
+                    setPendingWaypoint({
+                        id: generateId(),
+                        type: 'score',
+                        action: 'hub',
+                        position: { x: element.x, y: element.y },
+                        fuelDelta: 0,
+                        amountLabel: '...',
+                        timestamp: Date.now(),
+                        zone: 'allianceZone',
+                    });
+                    setAccumulatedFuel(0);
+                    setFuelHistory([]);
+                }
                 break;
-            case 'pass':
-            case 'pass_alliance':
-                setIsSelectingPass(true);
+            case 'ferry':
+            case 'ferry_opponent':
+                setPendingFerry({
+                    id: generateId(),
+                    type: 'ferry',
+                    action: 'ferry',
+                    position: { x: element.x, y: element.y },
+                    timestamp: Date.now(),
+                } as any);
+                setFerryFlowStep('ferry-type');
+                break;
+            case 'depot':
+                setPendingWaypoint({
+                    id: generateId(),
+                    type: 'collect',
+                    action: 'depot',
+                    position: { x: element.x, y: element.y },
+                    fuelDelta: 0,
+                    amountLabel: '...',
+                    timestamp: Date.now(),
+                    zone: 'allianceZone',
+                });
+                setAccumulatedFuel(0);
+                setFuelHistory([]);
+                break;
+            case 'collect_alliance':
+                setPendingWaypoint({
+                    id: generateId(),
+                    type: 'collect',
+                    action: 'collect_alliance',
+                    position: { x: element.x, y: element.y },
+                    fuelDelta: 0,
+                    amountLabel: '...',
+                    timestamp: Date.now(),
+                    zone: 'allianceZone',
+                });
+                setAccumulatedFuel(0);
+                setFuelHistory([]);
                 break;
             case 'tower':
-                // Open climb selector
+                // Open climb selector and start timing the climb
                 setFocusClimbTimeInputOnOpen(false);
+                setClimbStartTime(Date.now());
                 setPendingWaypoint({
                     id: generateId(),
                     type: 'climb',
@@ -596,34 +516,54 @@ function TeleopFieldMapContent({
             case 'defense_opponent':
                 startDefenseFlow('opponentZone');
                 break;
-            case 'pass_opponent':
-                // Pass from opponent zone - same behavior as regular pass
-                setIsSelectingPass(true);
+            case 'beached': {
+                const isCurrentlyBeached = beachedStart !== null;
+                if (isCurrentlyBeached) {
+                    const duration = Math.min(Date.now() - beachedStart, TELEOP_PHASE_DURATION_MS);
+                    onAddAction({
+                        id: generateId(),
+                        type: 'unbeached',
+                        action: 'unbeached',
+                        position: { x: element.x, y: element.y },
+                        timestamp: Date.now(),
+                        duration,
+                        zone: 'neutralZone',
+                    } as any);
+                    setBeachedStart(null);
+                } else {
+                    onAddAction({
+                        id: generateId(),
+                        type: 'beached',
+                        action: 'beached',
+                        position: { x: element.x, y: element.y },
+                        timestamp: Date.now(),
+                        zone: 'neutralZone',
+                    } as any);
+                    setBeachedStart(Date.now());
+                }
                 break;
-            case 'steal':
-                // Steal - create minimal action (no waypoint needed)
-                onAddAction({
-                    id: generateId(),
-                    type: 'steal',
-                    timestamp: Date.now(),
-                } as any);
-                break;
+            }
         }
     }, [
+        beachedStart,
+        disableHubFuelScoringPopup,
+        ferryFlowStep,
         generateId,
         isBrokenDown,
-        isSelectingPass,
-        isSelectingScore,
+        isDefenseEffectivenessDialogOpen,
+        isDefenseTargetDialogOpen,
         onAddAction,
-        pendingShotTypeWaypoint,
         pendingWaypoint,
         startDefenseFlow,
+        setAccumulatedFuel,
+        setBeachedStart,
         setClimbLevel,
         setClimbLocation,
         setClimbResult,
+        setFuelHistory,
         setFocusClimbTimeInputOnOpen,
-        setIsSelectingPass,
-        setIsSelectingScore,
+        setFerryFlowStep,
+        setPendingFerry,
         setPendingWaypoint,
         setStuckStarts,
         stuckStarts,
@@ -652,9 +592,6 @@ function TeleopFieldMapContent({
         setPendingWaypoint(null);
         setAccumulatedFuel(0);
         setFuelHistory([]);
-        setIsSelectingScore(false);
-        setIsSelectingPass(false);
-        resetDrawing();
     };
 
     const handleFuelUndo = () => {
@@ -670,6 +607,7 @@ function TeleopFieldMapContent({
         setPendingWaypoint(null);
         setClimbLevel(undefined);
         setClimbLocation(undefined);
+        setClimbStartTime(null);
     };
 
     // Undo wrapper that also clears active broken down state
@@ -691,10 +629,9 @@ function TeleopFieldMapContent({
 
     const getTeleopHotkeyLabel = (elementKey: string): string | undefined => {
         if (elementKey === 'hub') return 'S';
-        if (elementKey === 'pass' || elementKey === 'pass_alliance' || elementKey === 'pass_opponent') return 'A';
         if (elementKey === 'tower') return 'F';
         if (elementKey === 'defense_alliance' || elementKey === 'defense_neutral' || elementKey === 'defense_opponent') return 'D';
-        if (elementKey === 'steal') return 'S';
+        if (elementKey === 'beached') return 'B';
 
         const allianceTraversalMap: Record<string, string> = isFieldRotated
             ? { trench1: '1', bump1: '2', bump2: '3', trench2: '4' }
@@ -737,6 +674,22 @@ function TeleopFieldMapContent({
             setStuckStarts({});
         }
 
+        // Capture active beached time before proceeding
+        if (beachedStart) {
+            const beachedElement = FIELD_ELEMENTS['beached'];
+            const duration = Math.min(Date.now() - beachedStart, TELEOP_PHASE_DURATION_MS);
+            finalActions.push({
+                id: generateId(),
+                type: 'unbeached',
+                action: 'unbeached',
+                position: beachedElement ? { x: beachedElement.x, y: beachedElement.y } : { x: 0, y: 0 },
+                timestamp: Date.now(),
+                duration,
+                zone: 'neutralZone',
+            } as any);
+            setBeachedStart(null);
+        }
+
         // Capture any active broken down time before proceeding
         if (brokenDownStart) {
             const duration = Date.now() - brokenDownStart;
@@ -747,9 +700,11 @@ function TeleopFieldMapContent({
         if (onProceed) onProceed(finalActions);
     }, [
         actions,
+        beachedStart,
         brokenDownStart,
         generateId,
         onProceed,
+        setBeachedStart,
         setStuckStarts,
         stuckStarts,
         totalBrokenDownTime,
@@ -769,10 +724,8 @@ function TeleopFieldMapContent({
                     return;
                 }
 
-                if (pendingShotTypeWaypoint) {
-                    setPendingShotTypeWaypoint(null);
-                    setPendingWaypoint(null);
-                    resetDrawing();
+                if (ferryFlowStep !== null) {
+                    cancelFerryFlow();
                     return;
                 }
 
@@ -785,22 +738,8 @@ function TeleopFieldMapContent({
                         setPendingWaypoint(null);
                         setAccumulatedFuel(0);
                         setFuelHistory([]);
-                        setIsSelectingScore(false);
-                        setIsSelectingPass(false);
-                        resetDrawing();
                     }
                     return;
-                }
-
-                if (isSelectingScore) {
-                    setIsSelectingScore(false);
-                    resetDrawing();
-                    return;
-                }
-
-                if (isSelectingPass) {
-                    setIsSelectingPass(false);
-                    resetDrawing();
                 }
                 return;
             }
@@ -886,7 +825,7 @@ function TeleopFieldMapContent({
                 return;
             }
 
-            if (pendingWaypoint || pendingShotTypeWaypoint) return;
+            if (pendingWaypoint || ferryFlowStep !== null) return;
 
             const allianceStuckKeyMap: Record<string, string> = isFieldRotated
                 ? {
@@ -980,15 +919,12 @@ function TeleopFieldMapContent({
                 return;
             }
 
-            const isBusyWithSelection = isSelectingScore || isSelectingPass || isAnyStuck || isBrokenDown;
+            const isBusyWithSelection = ferryFlowStep !== null || isAnyStuck || isBrokenDown;
             if (isBusyWithSelection) return;
 
-            const canPassFromZone =
-                visibleElementSet.has('pass') ||
-                visibleElementSet.has('pass_alliance') ||
-                visibleElementSet.has('pass_opponent');
             const canScoreFromZone = visibleElementSet.has('hub');
-            const canStealFromZone = visibleElementSet.has('steal');
+            const canFerryFromZone = visibleElementSet.has('ferry') || visibleElementSet.has('ferry_opponent');
+            const canBeachedFromZone = visibleElementSet.has('beached');
             const canDefenseFromZone =
                 visibleElementSet.has('defense_alliance') ||
                 visibleElementSet.has('defense_neutral') ||
@@ -996,27 +932,24 @@ function TeleopFieldMapContent({
             const canClimbFromZone = visibleElements.includes('tower');
 
             if (key === 's') {
-                if (canStealFromZone) {
-                    event.preventDefault();
-                    onAddAction({
-                        id: generateId(),
-                        type: 'steal',
-                        timestamp: Date.now(),
-                    } as any);
-                    return;
-                }
-
                 if (!canScoreFromZone) return;
 
                 event.preventDefault();
-                setIsSelectingScore(true);
+                handleElementClick('hub');
                 return;
             }
 
             if (key === 'a') {
-                if (!canPassFromZone) return;
+                if (!canFerryFromZone) return;
                 event.preventDefault();
-                setIsSelectingPass(true);
+                handleElementClick('ferry');
+                return;
+            }
+
+            if (key === 'b') {
+                if (!canBeachedFromZone) return;
+                event.preventDefault();
+                handleElementClick('beached');
                 return;
             }
 
@@ -1054,6 +987,8 @@ function TeleopFieldMapContent({
     }, [
         activeZone,
         brokenDownStart,
+        cancelFerryFlow,
+        ferryFlowStep,
         generateId,
         handleElementClick,
         handleDefenseConfirm,
@@ -1065,15 +1000,10 @@ function TeleopFieldMapContent({
         isFieldRotated,
         isAnyStuck,
         isBrokenDown,
-        isSelectingPass,
-        isSelectingScore,
         opponentTeamOptions,
-        onAddAction,
         onUndo,
-        pendingShotTypeWaypoint,
         pendingWaypoint,
         resetDefenseDialogState,
-        resetDrawing,
         setAccumulatedFuel,
         setActiveZone,
         setBrokenDownStart,
@@ -1085,8 +1015,6 @@ function TeleopFieldMapContent({
         setSelectedDefenseTeam,
         setFuelHistory,
         setFocusClimbTimeInputOnOpen,
-        setIsSelectingPass,
-        setIsSelectingScore,
         setPendingWaypoint,
         selectedDefenseEffectiveness,
         startDefenseFlow,
@@ -1112,7 +1040,7 @@ function TeleopFieldMapContent({
                 phase="teleop"
                 stats={[
                     { label: 'Scored', value: totalFuelScored, color: 'green' },
-                    { label: 'Passed', value: totalFuelPassed, color: 'purple' },
+                    { label: 'Ferried', value: totalFuelFerried, color: 'purple' },
                 ]}
                 currentZone={activeZone}
                 isFullscreen={isFullscreen}
@@ -1157,25 +1085,17 @@ function TeleopFieldMapContent({
 
                     {/* Canvas Layer */}
                     <FieldCanvas
-                        ref={fieldCanvasRef}
                         actions={actions}
                         pendingWaypoint={pendingWaypoint}
-                        drawingPoints={drawingPoints}
                         alliance={alliance}
                         isFieldRotated={isFieldRotated}
                         width={canvasDimensions.width}
                         height={canvasDimensions.height}
-                        isSelectingScore={isSelectingScore}
-                        isSelectingPass={isSelectingPass}
                         drawConnectedPaths={false}
-                        drawingZoneBounds={currentZoneBounds}
-                        onPointerDown={handleDrawStart}
-                        onPointerMove={disablePathDrawingTapOnly ? undefined : handleDrawMove}
-                        onPointerUp={handleDrawEnd}
                     />
 
                     {/* Zone Overlays - show inactive zones for quick switching */}
-                    {!pendingWaypoint && !pendingShotTypeWaypoint && !isSelectingScore && !isSelectingPass && (
+                    {!pendingWaypoint && ferryFlowStep === null && !isDefenseTargetDialogOpen && !isDefenseEffectivenessDialogOpen && (
                         <>
                             <ZoneOverlay
                                 zone="allianceZone"
@@ -1205,7 +1125,7 @@ function TeleopFieldMapContent({
                     )}
 
                     {/* Field Buttons (only visible ones for this zone) */}
-                    {activeZone && !pendingWaypoint && !isSelectingScore && !isSelectingPass && (
+                    {activeZone && !pendingWaypoint && ferryFlowStep === null && !isDefenseTargetDialogOpen && !isDefenseEffectivenessDialogOpen && (
                         <>
                             {visibleElements.map((key) => {
                                 let element = FIELD_ELEMENTS[key];
@@ -1218,6 +1138,13 @@ function TeleopFieldMapContent({
                                     };
                                 }
 
+                                if (key === 'depot' || key === 'collect_alliance') {
+                                    element = {
+                                        ...element,
+                                        name: 'Collect',
+                                    };
+                                }
+
                                 // Override obstacle elements to always say "Stuck" in Teleop
                                 if (key.includes('trench') || key.includes('bump')) {
                                     element = {
@@ -1226,13 +1153,14 @@ function TeleopFieldMapContent({
                                     };
                                 }
 
-                                // Add counts for defense and steal buttons
+                                // Add counts for defense buttons
                                 let count: number | undefined = undefined;
                                 if (key === 'defense_alliance' || key === 'defense_neutral' || key === 'defense_opponent') {
                                     count = totalDefense;
-                                } else if (key === 'steal') {
-                                    count = totalSteal;
                                 }
+
+                                const isBeachedKey = key === 'beached';
+                                const isBeachedActive = isBeachedKey && beachedStart !== null;
 
                                 return (
                                     <FieldButton
@@ -1241,8 +1169,8 @@ function TeleopFieldMapContent({
                                         element={element}
                                         hotkeyLabel={getTeleopHotkeyLabel(key)}
                                         isVisible={true}
-                                        isDisabled={isAnyStuck && !stuckStarts[key]}
-                                        isStuck={!!stuckStarts[key]}
+                                        isDisabled={isBeachedKey ? false : (isAnyStuck && !stuckStarts[key])}
+                                        isStuck={!!stuckStarts[key] || isBeachedActive}
                                         count={count}
                                         onClick={handleElementClick}
                                         alliance={alliance}
@@ -1254,45 +1182,44 @@ function TeleopFieldMapContent({
                         </>
                     )}
 
-                    {/* Score/Pass Mode Overlay */}
-                    {!pendingShotTypeWaypoint && (isSelectingScore || isSelectingPass) && (
-                        <div
-                            className={cn(
-                                "absolute inset-x-0 top-1 z-20 flex pointer-events-none justify-center px-2",
-                                isFieldRotated && "bottom-1 top-auto"
-                            )}
-                        >
-                            <Card className={cn(
-                                "pointer-events-none bg-background/70 backdrop-blur-sm shadow-2xl py-1 px-2 sm:py-2 sm:px-3 flex flex-row items-center gap-2 sm:gap-3 max-w-[68%]",
-                                isFieldRotated && "rotate-180"
-                            )}>
-                                <Badge
-                                    variant="default"
-                                    className={cn(
-                                        "text-[10px] sm:text-xs",
-                                        isSelectingScore ? "bg-green-600" : "bg-purple-600"
-                                    )}
-                                >
-                                    {isSelectingScore ? 'SCORING' : 'PASSING'}
-                                </Badge>
-                                <span className="text-xs sm:text-sm font-medium truncate">
-                                    {isSelectingScore
-                                        ? (disablePathDrawingTapOnly ? 'Tap where robot scored' : 'Tap or draw to shoot')
-                                        : (disablePathDrawingTapOnly ? 'Tap where robot passed' : 'Tap or draw pass path')}
-                                </span>
-                                <Button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleFuelCancel();
-                                    }}
-                                    variant="ghost"
-                                    size="sm"
-                                    className="pointer-events-auto h-7 w-7 p-0 rounded-full"
-                                >
-                                    ✕
-                                </Button>
-                            </Card>
-                        </div>
+                    {ferryFlowStep === 'ferry-type' && (
+                        <FerryTypePopup
+                            isFieldRotated={isFieldRotated}
+                            onSelect={(ft) => {
+                                setPendingFerry((prev) => (prev ? { ...prev, ferryType: ft } : prev));
+                                setAccumulatedFuel(0);
+                                setFuelHistory([]);
+                                setFerryFlowStep('fuel');
+                            }}
+                            onCancel={cancelFerryFlow}
+                        />
+                    )}
+
+                    {ferryFlowStep === 'fuel' && pendingFerry && (
+                        <PendingWaypointPopup
+                            pendingWaypoint={pendingFerry}
+                            accumulatedFuel={accumulatedFuel}
+                            fuelHistory={fuelHistory}
+                            isFieldRotated={isFieldRotated}
+                            alliance={alliance}
+                            robotCapacity={robotCapacity}
+                            onFuelSelect={handleFuelSelect}
+                            onFuelUndo={handleFuelUndo}
+                            climbResult={null}
+                            onClimbResultSelect={() => {}}
+                            onConfirm={() => {
+                                onAddAction({
+                                    ...pendingFerry,
+                                    fuelDelta: accumulatedFuel,
+                                    amountLabel: String(accumulatedFuel),
+                                } as PathWaypoint);
+                                setPendingFerry(null);
+                                setFerryFlowStep(null);
+                                setAccumulatedFuel(0);
+                                setFuelHistory([]);
+                            }}
+                            onCancel={cancelFerryFlow}
+                        />
                     )}
 
                     {/* Post-Action Popup (Fuel or Climb) */}
@@ -1316,6 +1243,9 @@ function TeleopFieldMapContent({
                             focusClimbTimeInputOnOpen={focusClimbTimeInputOnOpen}
                             onConfirm={pendingWaypoint.type === 'climb' ? (selectedClimbStartTimeSecRemaining) => {
                                 if (climbLevel && climbLocation && climbResult) {
+                                    const climbDurationSec = climbStartTime
+                                        ? Math.round((Date.now() - climbStartTime) / 1000)
+                                        : undefined;
                                     const waypoint: PathWaypoint = {
                                         ...pendingWaypoint,
                                         action: `climbL${climbLevel}`,
@@ -1324,6 +1254,7 @@ function TeleopFieldMapContent({
                                         climbLocation,
                                         climbResult: climbResult,
                                         climbStartTimeSecRemaining: selectedClimbStartTimeSecRemaining ?? null,
+                                        climbDurationSec,
                                     };
                                     onAddAction(waypoint);
                                     setPendingWaypoint(null);
@@ -1331,27 +1262,14 @@ function TeleopFieldMapContent({
                                     setClimbLevel(undefined);
                                     setClimbLocation(undefined);
                                     setClimbResult('success');
+                                    setClimbStartTime(null);
                                     // Show proceed dialog
                                     setShowPostClimbProceed(true);
                                 }
                             } : handleFuelConfirm}
                             onCancel={pendingWaypoint.type === 'climb' ? handleClimbCancel : handleFuelCancel}
                         />
-                    )}
-
-                    {pendingShotTypeWaypoint && (
-                        <ShotTypePopup
-                            isFieldRotated={isFieldRotated}
-                            onSelect={handleShotTypeSelected}
-                            onCancel={() => {
-                                setPendingShotTypeWaypoint(null);
-                                setPendingWaypoint(null);
-                                resetDrawing();
-                            }}
-                        />
-                    )}
-
-                    <DefensePopup
+                    )}<DefensePopup
                         isFieldRotated={isFieldRotated}
                         isTargetOpen={isDefenseTargetDialogOpen}
                         isEffectivenessOpen={isDefenseEffectivenessDialogOpen}

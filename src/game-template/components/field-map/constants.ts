@@ -25,10 +25,10 @@ export const FIELD_ELEMENTS: Record<string, FieldElement> = {
     trench2: { x: 0.31, y: 0.87, label: 'TRENCH_ICON', name: 'Trench' },
 
     // Neutral Zone elements (center)
-    pass: { x: 0.50, y: 0.5, label: 'PASS_ICON', name: 'Pass' },
-    collect_neutral: { x: 0.5, y: 0.7, label: 'COLLECT_ICON', name: 'Collect' },
+    ferry: { x: 0.50, y: 0.5, label: 'FERRY_ICON', name: 'Ferry' },
+    beached: { x: 0.50, y: 0.3, label: 'BEACHED_ICON', name: 'Beached' },
 
-    // Alliance Zone extra collect
+    // Alliance Zone extra collect (human player station)
     collect_alliance: { x: 0.1, y: 0.7, label: 'COLLECT_ICON', name: 'Collect' },
 
     // Opponent Zone elements (foul)
@@ -39,9 +39,8 @@ export const FIELD_ELEMENTS: Record<string, FieldElement> = {
     defense_neutral: { x: 0.50, y: 0.15, label: 'DEFENSE_ICON', name: 'Defense' },
     defense_opponent: { x: 0.83, y: 0.15, label: 'DEFENSE_ICON', name: 'Defense' },
 
-    // Pass buttons
-    pass_alliance: { x: 0.17, y: 0.85, label: 'PASS_ICON', name: 'Pass' },
-    pass_opponent: { x: 0.83, y: 0.5, label: 'PASS_ICON', name: 'Pass' },
+    // Ferry buttons
+    ferry_opponent: { x: 0.83, y: 0.5, label: 'FERRY_ICON', name: 'Ferry' },
 
     // Opponent Zone obstacles (Teleop only)
     trench_opponent1: { x: 0.69, y: 0.13, label: 'TRENCH_ICON', name: 'Trench' },
@@ -49,8 +48,6 @@ export const FIELD_ELEMENTS: Record<string, FieldElement> = {
     bump_opponent2: { x: 0.69, y: 0.68, label: 'BUMP_ICON', name: 'Bump', scaleHeight: 1.4 },
     trench_opponent2: { x: 0.69, y: 0.87, label: 'TRENCH_ICON', name: 'Trench' },
 
-    // Steal action (Teleop only, opponent zone)
-    steal: { x: 0.83, y: 0.85, label: 'STEAL_ICON', name: 'Steal' },
 };
 
 // =============================================================================
@@ -164,14 +161,15 @@ export const PHASE_ZONE_ELEMENTS: Record<
     Partial<Record<ZoneType, string[]>>
 > = {
     auto: {
-        allianceZone: ['hub', 'depot', 'outpost', 'tower', 'collect_alliance', 'pass_alliance'],
-        neutralZone: ['pass', 'collect_neutral', 'opponent_foul'],
+        // Keep neutral actions available in Auto without requiring a traversal tap
+        allianceZone: ['hub', 'depot', 'collect_alliance', 'tower', 'ferry', 'beached'],
+        neutralZone: ['hub', 'ferry', 'beached', 'opponent_foul'],
         // Auto doesn't allow opponent zone access
     },
     teleop: {
-        allianceZone: ['hub', 'tower', 'defense_alliance', 'pass_alliance'],
-        neutralZone: ['pass', 'defense_neutral'],
-        opponentZone: ['defense_opponent', 'pass_opponent', 'steal'],
+        allianceZone: ['hub', 'tower', 'collect_alliance', 'depot', 'defense_alliance'],
+        neutralZone: ['ferry', 'beached', 'defense_neutral'],
+        opponentZone: ['defense_opponent', 'ferry_opponent'],
     },
 };
 

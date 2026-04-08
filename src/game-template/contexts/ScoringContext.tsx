@@ -61,7 +61,7 @@ export interface ScoringContextValue {
 
     // Derived calculations
     totalFuelScored: number;
-    totalFuelPassed: number;
+    totalFuelFerried: number;
 
     // Fuel action handlers
     handleFuelSelect: (amount: number) => void;
@@ -195,8 +195,8 @@ export function ScoringProvider({
         [actions]
     );
 
-    const totalFuelPassed = useMemo(() =>
-        actions.filter(a => a.type === 'pass').reduce((sum, a) => sum + Math.abs(a.fuelDelta || 0), 0),
+    const totalFuelFerried = useMemo(() =>
+        actions.filter(a => a.type === 'ferry').reduce((sum, a) => sum + Math.abs(a.fuelDelta || 0), 0),
         [actions]
     );
 
@@ -272,7 +272,7 @@ export function ScoringProvider({
 
         // Derived calculations
         totalFuelScored,
-        totalFuelPassed,
+        totalFuelFerried,
 
         // Fuel action handlers
         handleFuelSelect,

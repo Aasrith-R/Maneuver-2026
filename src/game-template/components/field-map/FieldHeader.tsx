@@ -178,6 +178,13 @@ export function FieldHeader({
         phase === 'auto' && proceedCountdownSeconds !== null
             ? `${proceedLabel} (${proceedCountdownSeconds}s)`
             : proceedLabel;
+
+    const shouldShowCountdown = phase === 'auto' && proceedCountdownSeconds !== null;
+    const shouldFlashCountdown =
+        shouldShowCountdown &&
+        proceedCountdownSeconds !== null &&
+        proceedCountdownSeconds <= 3 &&
+        proceedCountdownSeconds > 0;
     
     const [showNoShowDialog, setShowNoShowDialog] = useState(false);
 
@@ -271,6 +278,21 @@ export function FieldHeader({
             {/* Action Buttons */}
             <div className="flex items-center gap-1 pl-4">
                 {customActionSlot}
+
+                {shouldShowCountdown && (
+                    <Badge
+                        variant="secondary"
+                        className={cn(
+                            "h-8 px-2 md:px-3 text-[10px] md:text-xs font-bold tabular-nums flex items-center",
+                            shouldFlashCountdown
+                                ? "bg-red-600 text-white border border-red-600 auto-countdown-flash"
+                                : "bg-slate-100 text-slate-700 border border-slate-300 dark:bg-slate-800/50 dark:text-slate-200 dark:border-slate-700/50"
+                        )}
+                        title="Auto countdown"
+                    >
+                        Auto: {proceedCountdownSeconds}s
+                    </Badge>
+                )}
 
                 {/* Broken Down Button - Always visible */}
                 {onBrokenDownToggle && (

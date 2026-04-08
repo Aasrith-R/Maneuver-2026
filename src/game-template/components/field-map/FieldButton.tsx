@@ -5,7 +5,7 @@
  * Supports stuck state for traversal buttons.
  */
 
-import { Target, TrainFrontTunnel, Triangle, ArrowUpNarrowWide, Fuel, Warehouse, Inbox, TriangleAlert, HandCoins, Shield, Grab } from 'lucide-react';
+import { Target, TrainFrontTunnel, Triangle, ArrowUpNarrowWide, Fuel, Warehouse, Inbox, TriangleAlert, HandCoins, Shield, Grab, Umbrella, ArrowRight } from 'lucide-react';
 import { cn } from '@/core/lib/utils';
 import type { FieldButtonProps } from './types';
 
@@ -25,6 +25,8 @@ const ICON_MAP: Record<string, { icon: React.ElementType; className: string }> =
     'PASS_ICON': { icon: HandCoins, className: 'text-purple-400' },
     'DEFENSE_ICON': { icon: Shield, className: 'text-cyan-400' },
     'STEAL_ICON': { icon: Grab, className: 'text-rose-400' },
+    'BEACHED_ICON': { icon: Umbrella, className: 'text-amber-400' },
+    'FERRY_ICON': { icon: ArrowRight, className: 'text-purple-400' },
 };
 
 // =============================================================================

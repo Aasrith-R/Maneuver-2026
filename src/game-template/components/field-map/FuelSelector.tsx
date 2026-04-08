@@ -22,7 +22,7 @@ export interface FuelSelectorProps {
     accumulatedFuel: number;
     canUndo?: boolean;
     isLarge?: boolean;
-    type?: 'score' | 'pass' | 'collect';
+    type?: 'score' | 'ferry' | 'collect';
     className?: string;
     robotCapacity?: number; // Fuel capacity from pit scouting
 }
@@ -48,7 +48,7 @@ export function FuelSelector({
     const getTypeColor = () => {
         switch (type) {
             case 'score': return 'text-green-400';
-            case 'pass': return 'text-purple-400';
+            case 'ferry': return 'text-purple-400';
             case 'collect': return 'text-yellow-400';
             default: return 'text-green-400';
         }

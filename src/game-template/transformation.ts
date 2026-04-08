@@ -25,7 +25,7 @@ function generateActionDefaults(phase: 'auto' | 'teleop'): Record<string, number
   const defaults: Record<string, number> = {};
 
   // Actions tracked in both phases
-  const commonActions = ['fuelScored', 'fuelPassed', 'shotOnTheMove', 'shotStationary', 'trenchStuck', 'bumpStuck', 'brokenDown'];
+  const commonActions = ['fuelScored', 'fuelFerried', 'shotOnTheMove', 'shotStationary', 'ferryOnTheMove', 'ferryStationary', 'beached', 'trenchStuck', 'bumpStuck', 'brokenDown'];
 
   // Auto-only actions
   const autoOnlyActions = ['depotCollect', 'outpostCollect', 'foulCommitted'];
@@ -173,9 +173,20 @@ export const gameDataTransformation: DataTransformation = {
               result.auto.outpostCollectCount = (result.auto.outpostCollectCount || 0) + 1;
             }
             break;
-          case 'pass':
-            // fuelDelta is negative for passing (robot loses fuel)
-            result.auto.fuelPassedCount = (result.auto.fuelPassedCount || 0) + Math.abs(wp.fuelDelta || 0);
+          case 'ferry':
+            // fuelDelta is negative for ferrying (robot loses fuel)
+            result.auto.fuelFerriedCount = (result.auto.fuelFerriedCount || 0) + Math.abs(wp.fuelDelta || 0);
+            if (wp.ferryType === 'onTheMove') {
+              result.auto.ferryOnTheMoveCount = (result.auto.ferryOnTheMoveCount || 0) + 1;
+            } else if (wp.ferryType === 'stationary') {
+              result.auto.ferryStationaryCount = (result.auto.ferryStationaryCount || 0) + 1;
+            }
+            break;
+          case 'beached':
+            result.auto.beachedCount = (result.auto.beachedCount || 0) + 1;
+            break;
+          case 'unbeached':
+            result.auto.beachedDuration = (result.auto.beachedDuration || 0) + (wp.duration || 0);
             break;
           case 'traversal':
             // Boolean flags for trench/bump usage in auto
@@ -241,13 +252,27 @@ export const gameDataTransformation: DataTransformation = {
               result.teleop.shotStationaryCount = (result.teleop.shotStationaryCount || 0) + 1;
             }
             break;
-          case 'pass':
-            result.teleop.fuelPassedCount = (result.teleop.fuelPassedCount || 0) + Math.abs(wp.fuelDelta || 0);
+          case 'ferry':
+            result.teleop.fuelFerriedCount = (result.teleop.fuelFerriedCount || 0) + Math.abs(wp.fuelDelta || 0);
+            if (wp.ferryType === 'onTheMove') {
+              result.teleop.ferryOnTheMoveCount = (result.teleop.ferryOnTheMoveCount || 0) + 1;
+            } else if (wp.ferryType === 'stationary') {
+              result.teleop.ferryStationaryCount = (result.teleop.ferryStationaryCount || 0) + 1;
+            }
+            break;
+          case 'beached':
+            result.teleop.beachedCount = (result.teleop.beachedCount || 0) + 1;
+            break;
+          case 'unbeached':
+            result.teleop.beachedDuration = (result.teleop.beachedDuration || 0) + (wp.duration || 0);
             break;
           case 'climb': {
             // Track climb level, location, and outcome in endgame section
             if (typeof wp.climbStartTimeSecRemaining === 'number') {
               result.teleop.teleopClimbStartTimeSecRemaining = wp.climbStartTimeSecRemaining;
+            }
+            if (typeof wp.climbDurationSec === 'number') {
+              result.endgame.climbDurationSec = wp.climbDurationSec;
             }
             const level = [1, 2, 3].includes(wp.climbLevel) ? wp.climbLevel : 1;
             if (wp.climbLocation === 'side') {
