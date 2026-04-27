@@ -19,6 +19,33 @@ export type DrivetrainType = 'swerve' | 'tank' | 'mecanum' | 'other';
  */
 export type ProgrammingLanguage = 'Java' | 'C++' | 'Python' | 'LabVIEW' | 'other';
 
+/** Auto path planning software */
+export type PathPlannerSoftware = 'PathPlanner' | 'Choreo' | 'Beeline' | 'other';
+
+/** FRC programming paradigm */
+export type ProgrammingParadigm = 'Command Based' | 'Iterative';
+
+/** PathPlanner tuning status */
+export type TuningStatus = 'Well Tuned' | 'Overshoots' | 'Not Tuned' | 'other';
+
+/** Vision camera hardware */
+export type CameraHardware = 'Limelight' | 'ArduCAM' | 'ThriftyCAM' | 'other';
+
+/** Vision processing software */
+export type VisionSoftware = 'PhotonVision' | 'Limelight' | 'other';
+
+/** Swerve drive library / control system */
+export type SwerveLibrary = 'CTRE' | 'YAGSL' | 'other';
+
+/** Swerve module type */
+export type SwerveType = 'Thrifty' | 'WCP' | 'REV' | 'Mk4n' | 'Mk4i' | 'Mk5i' | 'Mk5n' | 'custom';
+
+/** Wheel tread type */
+export type TreadType = 'Molded' | 'Colson' | 'Stealth' | 'other';
+
+/** Intake mechanism type */
+export type IntakeType = 'Pivot' | 'Linear' | 'other';
+
 /**
  * Base interface for pit scouting entries
  * 
@@ -52,11 +79,23 @@ export interface PitScoutingEntryBase {
     timestamp: number;              // Unix milliseconds (not ISO string) for efficient comparison
 
     // Universal pit scouting fields (not game-specific)
-    robotPhoto?: string;            // Base64 or URL
-    weight?: number;                // Robot weight in pounds
-    drivetrain?: DrivetrainType;    // Standard FRC drivetrain types
-    programmingLanguage?: ProgrammingLanguage; // Standard FRC programming languages
-    notes?: string;                 // General observations
+    robotPhoto?: string;                        // Base64 or URL
+    weight?: number;                            // Robot weight in pounds
+    drivetrain?: DrivetrainType;                // Standard FRC drivetrain types
+    programmingLanguage?: ProgrammingLanguage;  // Standard FRC programming languages
+    programmingParadigm?: ProgrammingParadigm;  // Command Based vs Iterative
+    pathPlannerSoftware?: PathPlannerSoftware;  // Auto path planning tool
+    tuningStatus?: TuningStatus;                // PathPlanner tuning quality
+    cameraHardware?: CameraHardware;            // Vision camera hardware
+    visionSoftware?: VisionSoftware;            // Vision processing software
+    bestDrivenMatch?: string;                   // Best autonomous match identifier
+    swerveLibrary?: SwerveLibrary;              // Swerve control library (CTRE / YAGSL)
+    swerveType?: SwerveType;                    // Swerve module type
+    swerveGearRatio?: string;                   // Swerve gear ratio (e.g. "L2", "6.75:1")
+    treadType?: TreadType;                      // Wheel tread type
+    lastTreadSwap?: string;                     // Date/description of last tread swap
+    intakeType?: IntakeType;                    // Intake mechanism type
+    notes?: string;                             // General observations
 
     // Game-specific data (defined by game implementation)
     gameData: Record<string, unknown>; // Game implementations define typed structure here (required, use {} for empty)

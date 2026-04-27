@@ -382,7 +382,7 @@ export const strategyColumns = {
     // Overall stats (use rawValues for user-selectable aggregation)
     overall: {
         "rawValues.totalFuel": { label: "Fuel Scored", visible: true, numeric: true },
-        "rawValues.totalFuelFerried": { label: "Fuel Ferried", visible: false, numeric: true },
+        "rawValues.totalFuelPassed": { label: "Fuel Ferried", visible: false, numeric: true },
         "statboticsTotalFuel": { label: "Statbotics EPA (Fuel Total)", visible: false, numeric: true },
         "statboticsTotalTower": { label: "Statbotics EPA (Tower Total)", visible: false, numeric: true },
         "coprHubTotalPoints": { label: "TBA COPR (Hub Total)", visible: false, numeric: true },
@@ -419,13 +419,13 @@ export const strategyColumns = {
         "defenseNotEffectiveRate": { label: "Defense No Impact %", visible: false, numeric: true, percentage: true },
         "teleopShotOnTheMoveRate": { label: "Teleop Shot On Move %", visible: true, numeric: true, percentage: true },
         "teleopShotStationaryRate": { label: "Teleop Shot Stationary %", visible: true, numeric: true, percentage: true },
-        "rawValues.teleopFuelFerried": { label: "Teleop Ferried", visible: false, numeric: true },
+        "rawValues.teleopFuelPassed": { label: "Teleop Ferried", visible: false, numeric: true },
         "teleop.defenseRate": { label: "Defense %", visible: false, numeric: true, percentage: true },
         "endgame.usedTrenchInTeleopRate": { label: "Used Trench %", visible: false, numeric: true, percentage: true },
         "endgame.usedBumpInTeleopRate": { label: "Used Bump %", visible: false, numeric: true, percentage: true },
-        "endgame.ferriedToAllianceFromNeutralRate": { label: "Ferried Neutral → Alliance %", visible: false, numeric: true, percentage: true },
-        "endgame.ferriedToAllianceFromOpponentRate": { label: "Ferried Opponent → Alliance %", visible: false, numeric: true, percentage: true },
-        "endgame.ferriedToNeutralRate": { label: "Ferried Opponent → Neutral %", visible: false, numeric: true, percentage: true },
+        "endgame.passedToAllianceFromNeutralRate": { label: "Ferried Neutral → Alliance %", visible: false, numeric: true, percentage: true },
+        "endgame.passedToAllianceFromOpponentRate": { label: "Ferried Opponent → Alliance %", visible: false, numeric: true, percentage: true },
+        "endgame.passedToNeutralRate": { label: "Ferried Opponent → Neutral %", visible: false, numeric: true, percentage: true },
         "teleop.ferryOnTheMoveRate": { label: "Ferry On Move %", visible: false, numeric: true, percentage: true },
         "teleop.ferryStationaryRate": { label: "Ferry Stationary %", visible: false, numeric: true, percentage: true },
         "teleop.beachedRate": { label: "Beached %", visible: false, numeric: true, percentage: true },
@@ -456,7 +456,7 @@ export const strategyColumns = {
 export const strategyPresets: Record<string, string[]> = {
     essential: ["teamNumber", "matchCount", "rawValues.totalPoints", "rawValues.scaledTotalFuel", "fuelTotalOPR", "endgame.climbSuccessRate"],
     auto: ["teamNumber", "matchCount", "rawValues.autoPoints", "rawValues.autoFuel", "rawValues.scaledAutoFuel", "fuelAutoOPR", "autoShotOnTheMoveRate", "autoShotStationaryRate", "autoClimbRate", "autoClimbAttempts", "autoClimbFromSideRate", "autoClimbFromMiddleRate", "rawValues.autoClimbStartTimeSec"],
-    teleop: ["teamNumber", "matchCount", "rawValues.teleopPoints", "rawValues.teleopFuel", "rawValues.scaledTeleopFuel", "fuelTeleopOPR", "defenseEffectivenessScore", "teleopShotOnTheMoveRate", "teleopShotStationaryRate", "rawValues.teleopFuelFerried", "teleop.ferryOnTheMoveRate", "teleop.ferryStationaryRate", "endgame.usedTrenchInTeleopRate", "endgame.usedBumpInTeleopRate", "endgame.ferriedToAllianceFromNeutralRate", "endgame.ferriedToAllianceFromOpponentRate", "endgame.ferriedToNeutralRate"],
+    teleop: ["teamNumber", "matchCount", "rawValues.teleopPoints", "rawValues.teleopFuel", "rawValues.scaledTeleopFuel", "fuelTeleopOPR", "defenseEffectivenessScore", "teleopShotOnTheMoveRate", "teleopShotStationaryRate", "rawValues.teleopFuelPassed", "teleop.ferryOnTheMoveRate", "teleop.ferryStationaryRate", "endgame.usedTrenchInTeleopRate", "endgame.usedBumpInTeleopRate", "endgame.passedToAllianceFromNeutralRate", "endgame.passedToAllianceFromOpponentRate", "endgame.passedToNeutralRate"],
     endgame: ["teamNumber", "matchCount", "rawValues.endgamePoints", "rawValues.endgameClimbStartTimeSec", "endgame.climbAttempts", "endgame.climbL1Rate", "endgame.climbL1Attempts", "endgame.climbL2Rate", "endgame.climbL2Attempts", "endgame.climbL3Rate", "endgame.climbL3Attempts", "endgame.climbFromSideRate", "endgame.climbFromMiddleRate"],
     basic: ["teamNumber", "eventKey", "matchCount"],
 };

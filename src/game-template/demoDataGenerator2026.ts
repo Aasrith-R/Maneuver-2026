@@ -536,8 +536,9 @@ export const generate2026GameData: GameDataGenerator = (profile, matchKey, conte
                 : undefined
         );
         teleopActions.push({
-            type: 'pass',
+            type: 'ferry',
             action: 'fuelPassed',
+            ferryType: Math.random() < 0.6 ? 'onTheMove' : 'stationary',
             timestamp: teleopPassTimestamp,
             position: jitter(passSpot.pos, passSpot.spread),
             fuelDelta: -burst,
@@ -935,10 +936,10 @@ export const generate2026GameData: GameDataGenerator = (profile, matchKey, conte
     const passTrackingMissingChance = passTrackingMissingChanceBySkill[profile.skillLevel] ?? 0.12;
     if (Math.random() < passTrackingMissingChance) {
         if (transformed.auto && typeof transformed.auto === 'object') {
-            delete transformed.auto.fuelPassedCount;
+            delete transformed.auto.fuelFerriedCount;
         }
         if (transformed.teleop && typeof transformed.teleop === 'object') {
-            delete transformed.teleop.fuelPassedCount;
+            delete transformed.teleop.fuelFerriedCount;
         }
     }
 

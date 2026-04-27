@@ -59,6 +59,18 @@ export function PitScoutingPage({
     setWeight,
     setDrivetrain,
     setProgrammingLanguage,
+    setProgrammingParadigm,
+    setPathPlannerSoftware,
+    setTuningStatus,
+    setCameraHardware,
+    setVisionSoftware,
+    setBestDrivenMatch,
+    setSwerveLibrary,
+    setSwerveType,
+    setSwerveGearRatio,
+    setTreadType,
+    setLastTreadSwap,
+    setIntakeType,
     setNotes,
     setGameData,
     handleSubmit,
@@ -259,9 +271,33 @@ export function PitScoutingPage({
           weight={formState.weight}
           drivetrain={formState.drivetrain}
           programmingLanguage={formState.programmingLanguage}
+          programmingParadigm={formState.programmingParadigm}
+          pathPlannerSoftware={formState.pathPlannerSoftware}
+          tuningStatus={formState.tuningStatus}
+          cameraHardware={formState.cameraHardware}
+          visionSoftware={formState.visionSoftware}
+          bestDrivenMatch={formState.bestDrivenMatch}
+          swerveLibrary={formState.swerveLibrary}
+          swerveType={formState.swerveType}
+          swerveGearRatio={formState.swerveGearRatio}
+          treadType={formState.treadType}
+          lastTreadSwap={formState.lastTreadSwap}
+          intakeType={formState.intakeType}
           onWeightChange={setWeight}
           onDrivetrainChange={setDrivetrain}
           onProgrammingLanguageChange={setProgrammingLanguage}
+          onProgrammingParadigmChange={setProgrammingParadigm}
+          onPathPlannerSoftwareChange={setPathPlannerSoftware}
+          onTuningStatusChange={setTuningStatus}
+          onCameraHardwareChange={setCameraHardware}
+          onVisionSoftwareChange={setVisionSoftware}
+          onBestDrivenMatchChange={setBestDrivenMatch}
+          onSwerveLibraryChange={setSwerveLibrary}
+          onSwerveTypeChange={setSwerveType}
+          onSwerveGearRatioChange={setSwerveGearRatio}
+          onTreadTypeChange={setTreadType}
+          onLastTreadSwapChange={setLastTreadSwap}
+          onIntakeTypeChange={setIntakeType}
         />
 
         {/* Game-Specific Questions Slot */}

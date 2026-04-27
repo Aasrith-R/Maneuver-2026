@@ -75,18 +75,33 @@ export const calculateTeamStats = (teamMatches: ScoutingEntry[]): Omit<TeamStats
         val(m.gameData?.auto?.fuelScoredCount)
     );
 
-    const autoFuelPassedTotal = sum(teamMatches, m =>
-        val(m.gameData?.auto?.fuelFerriedCount ?? m.gameData?.auto?.fuelPassedCount)
-    );
+    // Helper: sum fuel from stored path waypoints (fallback for pre-migration data where
+    // 'pass' type waypoints were not counted by transformation into fuelFerriedCount)
+    const sumFuelFromPath = (path: unknown): number => {
+        if (!Array.isArray(path)) return 0;
+        return (path as any[])
+            .filter(wp => wp?.type === 'ferry' || wp?.type === 'pass')
+            .reduce((s: number, wp: any) => s + Math.abs(wp?.fuelDelta || 0), 0);
+    };
+    const countFerryTypeFromPath = (path: unknown, ferryType: 'onTheMove' | 'stationary'): number => {
+        if (!Array.isArray(path)) return 0;
+        return (path as any[]).filter(wp => (wp?.type === 'ferry' || wp?.type === 'pass') && wp?.ferryType === ferryType).length;
+    };
+
+    const autoFuelPassedTotal = sum(teamMatches, m => {
+        const direct = val(m.gameData?.auto?.fuelFerriedCount ?? m.gameData?.auto?.fuelPassedCount);
+        return direct > 0 ? direct : sumFuelFromPath(m.gameData?.auto?.autoPath);
+    });
 
     // Teleop fuel
     const teleopFuelTotal = sum(teamMatches, m =>
         val(m.gameData?.teleop?.fuelScoredCount)
     );
 
-    const teleopFuelPassedTotal = sum(teamMatches, m =>
-        val(m.gameData?.teleop?.fuelFerriedCount ?? m.gameData?.teleop?.fuelPassedCount)
-    );
+    const teleopFuelPassedTotal = sum(teamMatches, m => {
+        const direct = val(m.gameData?.teleop?.fuelFerriedCount ?? m.gameData?.teleop?.fuelPassedCount);
+        return direct > 0 ? direct : sumFuelFromPath(m.gameData?.teleop?.teleopPath);
+    });
 
     // Total fuel
     const totalFuelScored = autoFuelTotal + teleopFuelTotal;
@@ -153,6 +168,14 @@ export const calculateTeamStats = (teamMatches: ScoutingEntry[]): Omit<TeamStats
             startPosition,
             autoFuel: val(match.gameData?.auto?.fuelScoredCount),
             teleopFuel: val(match.gameData?.teleop?.fuelScoredCount),
+            autoFuelPassed: (() => {
+                const direct = val(match.gameData?.auto?.fuelFerriedCount ?? match.gameData?.auto?.fuelPassedCount);
+                return direct > 0 ? direct : sumFuelFromPath(match.gameData?.auto?.autoPath);
+            })(),
+            teleopFuelPassed: (() => {
+                const direct = val(match.gameData?.teleop?.fuelFerriedCount ?? match.gameData?.teleop?.fuelPassedCount);
+                return direct > 0 ? direct : sumFuelFromPath(match.gameData?.teleop?.teleopPath);
+            })(),
             autoPath,
         };
     }).sort((a, b) => parseInt(a.matchNumber) - parseInt(b.matchNumber));
@@ -199,9 +222,28 @@ export const calculateTeamStats = (teamMatches: ScoutingEntry[]): Omit<TeamStats
     const teleopClimbAttemptCount = Math.max(levelAttemptCount, climbSuccessCount + climbFailedCount, endgameClimbLocationAttemptCount);
     const usedTrenchInTeleopCount = teamMatches.filter(m => m.gameData?.endgame?.usedTrenchInTeleop === true).length;
     const usedBumpInTeleopCount = teamMatches.filter(m => m.gameData?.endgame?.usedBumpInTeleop === true).length;
-    const passedToAllianceFromNeutralCount = teamMatches.filter(m => m.gameData?.endgame?.passedToAllianceFromNeutral === true).length;
-    const passedToAllianceFromOpponentCount = teamMatches.filter(m => m.gameData?.endgame?.passedToAllianceFromOpponent === true).length;
-    const passedToNeutralCount = teamMatches.filter(m => m.gameData?.endgame?.passedToNeutral === true).length;
+    // Support both old field names (passedToAlliance*) and new names (ferriedToAlliance*)
+    const passedToAllianceFromNeutralCount = teamMatches.filter(m =>
+        m.gameData?.endgame?.ferriedToAllianceFromNeutral === true ||
+        m.gameData?.endgame?.passedToAllianceFromNeutral === true
+    ).length;
+    const passedToAllianceFromOpponentCount = teamMatches.filter(m =>
+        m.gameData?.endgame?.ferriedToAllianceFromOpponent === true ||
+        m.gameData?.endgame?.passedToAllianceFromOpponent === true
+    ).length;
+    const passedToNeutralCount = teamMatches.filter(m =>
+        m.gameData?.endgame?.ferriedToNeutral === true ||
+        m.gameData?.endgame?.passedToNeutral === true
+    ).length;
+    const teleopFerryOnTheMoveTotal = sum(teamMatches, m => {
+        const direct = val(m.gameData?.teleop?.ferryOnTheMoveCount);
+        return direct > 0 ? direct : countFerryTypeFromPath(m.gameData?.teleop?.teleopPath, 'onTheMove');
+    });
+    const teleopFerryStationaryTotal = sum(teamMatches, m => {
+        const direct = val(m.gameData?.teleop?.ferryStationaryCount);
+        return direct > 0 ? direct : countFerryTypeFromPath(m.gameData?.teleop?.teleopPath, 'stationary');
+    });
+    const teleopFerryTotal = teleopFerryOnTheMoveTotal + teleopFerryStationaryTotal;
     const teleopClimbStartTimes = teamMatches
         .map(m => m.gameData?.teleop?.teleopClimbStartTimeSecRemaining)
         .filter((time): time is number => typeof time === 'number');
@@ -611,6 +653,9 @@ export const calculateTeamStats = (teamMatches: ScoutingEntry[]): Omit<TeamStats
             avgFuelPassed: round(teleopFuelPassedTotal / matchCount),
             shotOnTheMoveRate: percent(teleopShotOnTheMoveTotal, teleopShotTypeTotal),
             shotStationaryRate: percent(teleopShotStationaryTotal, teleopShotTypeTotal),
+            ferryOnTheMoveRate: percent(teleopFerryOnTheMoveTotal, teleopFerryTotal),
+            ferryStationaryRate: percent(teleopFerryStationaryTotal, teleopFerryTotal),
+            avgFerried: round(teleopFerryOnTheMoveTotal + teleopFerryStationaryTotal > 0 ? (teleopFerryOnTheMoveTotal + teleopFerryStationaryTotal) / matchCount : 0),
             defenseRate: percent(defenseCount, matchCount),
             // 2026-specific detailed stats
             totalDefenseActions: round(totalDefenseActions / matchCount),

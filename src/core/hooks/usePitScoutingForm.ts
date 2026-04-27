@@ -1,5 +1,18 @@
 import { useState, useCallback } from "react";
-import type { PitScoutingEntryBase, DrivetrainType, ProgrammingLanguage } from "@/types/database";
+import type {
+  PitScoutingEntryBase,
+  DrivetrainType,
+  ProgrammingLanguage,
+  PathPlannerSoftware,
+  ProgrammingParadigm,
+  TuningStatus,
+  CameraHardware,
+  VisionSoftware,
+  SwerveLibrary,
+  SwerveType,
+  TreadType,
+  IntakeType,
+} from "@/types/database";
 import {
   savePitScoutingEntry,
   loadPitScoutingByTeamAndEvent,
@@ -14,6 +27,18 @@ interface PitScoutingFormState {
   weight?: number;
   drivetrain?: DrivetrainType;
   programmingLanguage?: ProgrammingLanguage;
+  programmingParadigm?: ProgrammingParadigm;
+  pathPlannerSoftware?: PathPlannerSoftware;
+  tuningStatus?: TuningStatus;
+  cameraHardware?: CameraHardware;
+  visionSoftware?: VisionSoftware;
+  bestDrivenMatch?: string;
+  swerveLibrary?: SwerveLibrary;
+  swerveType?: SwerveType;
+  swerveGearRatio?: string;
+  treadType?: TreadType;
+  lastTreadSwap?: string;
+  intakeType?: IntakeType;
   notes?: string;
   gameData?: Record<string, unknown>;
 }
@@ -30,6 +55,18 @@ interface UsePitScoutingFormReturn {
   setWeight: (value: number | undefined) => void;
   setDrivetrain: (value: DrivetrainType | undefined) => void;
   setProgrammingLanguage: (value: ProgrammingLanguage | undefined) => void;
+  setProgrammingParadigm: (value: ProgrammingParadigm | undefined) => void;
+  setPathPlannerSoftware: (value: PathPlannerSoftware | undefined) => void;
+  setTuningStatus: (value: TuningStatus | undefined) => void;
+  setCameraHardware: (value: CameraHardware | undefined) => void;
+  setVisionSoftware: (value: VisionSoftware | undefined) => void;
+  setBestDrivenMatch: (value: string | undefined) => void;
+  setSwerveLibrary: (value: SwerveLibrary | undefined) => void;
+  setSwerveType: (value: SwerveType | undefined) => void;
+  setSwerveGearRatio: (value: string | undefined) => void;
+  setTreadType: (value: TreadType | undefined) => void;
+  setLastTreadSwap: (value: string | undefined) => void;
+  setIntakeType: (value: IntakeType | undefined) => void;
   setNotes: (value: string | undefined) => void;
 
   // Game data setter (for game-specific questions)
@@ -55,6 +92,18 @@ export function usePitScoutingForm(): UsePitScoutingFormReturn {
     weight: undefined,
     drivetrain: undefined,
     programmingLanguage: undefined,
+    programmingParadigm: undefined,
+    pathPlannerSoftware: undefined,
+    tuningStatus: undefined,
+    cameraHardware: undefined,
+    visionSoftware: undefined,
+    bestDrivenMatch: undefined,
+    swerveLibrary: undefined,
+    swerveType: undefined,
+    swerveGearRatio: undefined,
+    treadType: undefined,
+    lastTreadSwap: undefined,
+    intakeType: undefined,
     notes: undefined,
     gameData: undefined,
   });
@@ -85,6 +134,18 @@ export function usePitScoutingForm(): UsePitScoutingFormReturn {
           weight: existing.weight,
           drivetrain: existing.drivetrain,
           programmingLanguage: existing.programmingLanguage,
+          programmingParadigm: existing.programmingParadigm,
+          pathPlannerSoftware: existing.pathPlannerSoftware,
+          tuningStatus: existing.tuningStatus,
+          cameraHardware: existing.cameraHardware,
+          visionSoftware: existing.visionSoftware,
+          bestDrivenMatch: existing.bestDrivenMatch,
+          swerveLibrary: existing.swerveLibrary,
+          swerveType: existing.swerveType,
+          swerveGearRatio: existing.swerveGearRatio,
+          treadType: existing.treadType,
+          lastTreadSwap: existing.lastTreadSwap,
+          intakeType: existing.intakeType,
           notes: existing.notes,
           gameData: existing.gameData,
         }));
@@ -132,6 +193,54 @@ export function usePitScoutingForm(): UsePitScoutingFormReturn {
     },
     []
   );
+
+  const setProgrammingParadigm = useCallback((value: ProgrammingParadigm | undefined) => {
+    setFormState((prev) => ({ ...prev, programmingParadigm: value }));
+  }, []);
+
+  const setPathPlannerSoftware = useCallback((value: PathPlannerSoftware | undefined) => {
+    setFormState((prev) => ({ ...prev, pathPlannerSoftware: value }));
+  }, []);
+
+  const setTuningStatus = useCallback((value: TuningStatus | undefined) => {
+    setFormState((prev) => ({ ...prev, tuningStatus: value }));
+  }, []);
+
+  const setCameraHardware = useCallback((value: CameraHardware | undefined) => {
+    setFormState((prev) => ({ ...prev, cameraHardware: value }));
+  }, []);
+
+  const setVisionSoftware = useCallback((value: VisionSoftware | undefined) => {
+    setFormState((prev) => ({ ...prev, visionSoftware: value }));
+  }, []);
+
+  const setBestDrivenMatch = useCallback((value: string | undefined) => {
+    setFormState((prev) => ({ ...prev, bestDrivenMatch: value }));
+  }, []);
+
+  const setSwerveLibrary = useCallback((value: SwerveLibrary | undefined) => {
+    setFormState((prev) => ({ ...prev, swerveLibrary: value }));
+  }, []);
+
+  const setSwerveType = useCallback((value: SwerveType | undefined) => {
+    setFormState((prev) => ({ ...prev, swerveType: value }));
+  }, []);
+
+  const setSwerveGearRatio = useCallback((value: string | undefined) => {
+    setFormState((prev) => ({ ...prev, swerveGearRatio: value }));
+  }, []);
+
+  const setTreadType = useCallback((value: TreadType | undefined) => {
+    setFormState((prev) => ({ ...prev, treadType: value }));
+  }, []);
+
+  const setLastTreadSwap = useCallback((value: string | undefined) => {
+    setFormState((prev) => ({ ...prev, lastTreadSwap: value }));
+  }, []);
+
+  const setIntakeType = useCallback((value: IntakeType | undefined) => {
+    setFormState((prev) => ({ ...prev, intakeType: value }));
+  }, []);
 
   const setNotes = useCallback((value: string | undefined) => {
     setFormState((prev) => ({ ...prev, notes: value }));
@@ -182,8 +291,20 @@ export function usePitScoutingForm(): UsePitScoutingFormReturn {
         weight: formState.weight,
         drivetrain: formState.drivetrain,
         programmingLanguage: formState.programmingLanguage,
+        programmingParadigm: formState.programmingParadigm,
+        pathPlannerSoftware: formState.pathPlannerSoftware,
+        tuningStatus: formState.tuningStatus,
+        cameraHardware: formState.cameraHardware,
+        visionSoftware: formState.visionSoftware,
+        bestDrivenMatch: formState.bestDrivenMatch,
+        swerveLibrary: formState.swerveLibrary,
+        swerveType: formState.swerveType,
+        swerveGearRatio: formState.swerveGearRatio,
+        treadType: formState.treadType,
+        lastTreadSwap: formState.lastTreadSwap,
+        intakeType: formState.intakeType,
         notes: formState.notes,
-        gameData: formState.gameData ?? {}, // Default to empty object if undefined
+        gameData: formState.gameData ?? {},
       };
 
       await savePitScoutingEntry(entry);
@@ -214,6 +335,18 @@ export function usePitScoutingForm(): UsePitScoutingFormReturn {
       weight: undefined,
       drivetrain: undefined,
       programmingLanguage: undefined,
+      programmingParadigm: undefined,
+      pathPlannerSoftware: undefined,
+      tuningStatus: undefined,
+      cameraHardware: undefined,
+      visionSoftware: undefined,
+      bestDrivenMatch: undefined,
+      swerveLibrary: undefined,
+      swerveType: undefined,
+      swerveGearRatio: undefined,
+      treadType: undefined,
+      lastTreadSwap: undefined,
+      intakeType: undefined,
       notes: undefined,
       gameData: undefined,
     });
@@ -229,6 +362,18 @@ export function usePitScoutingForm(): UsePitScoutingFormReturn {
     setWeight,
     setDrivetrain,
     setProgrammingLanguage,
+    setProgrammingParadigm,
+    setPathPlannerSoftware,
+    setTuningStatus,
+    setCameraHardware,
+    setVisionSoftware,
+    setBestDrivenMatch,
+    setSwerveLibrary,
+    setSwerveType,
+    setSwerveGearRatio,
+    setTreadType,
+    setLastTreadSwap,
+    setIntakeType,
     setNotes,
     setGameData,
     validateForm,

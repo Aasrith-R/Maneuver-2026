@@ -173,6 +173,7 @@ export const gameDataTransformation: DataTransformation = {
               result.auto.outpostCollectCount = (result.auto.outpostCollectCount || 0) + 1;
             }
             break;
+          case 'pass':
           case 'ferry':
             // fuelDelta is negative for ferrying (robot loses fuel)
             result.auto.fuelFerriedCount = (result.auto.fuelFerriedCount || 0) + Math.abs(wp.fuelDelta || 0);
@@ -252,6 +253,7 @@ export const gameDataTransformation: DataTransformation = {
               result.teleop.shotStationaryCount = (result.teleop.shotStationaryCount || 0) + 1;
             }
             break;
+          case 'pass':
           case 'ferry':
             result.teleop.fuelFerriedCount = (result.teleop.fuelFerriedCount || 0) + Math.abs(wp.fuelDelta || 0);
             if (wp.ferryType === 'onTheMove') {

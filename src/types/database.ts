@@ -31,8 +31,34 @@ export interface ScoutingDatabaseSchema {
 // ============================================================================
 
 // Entry types are in: src/core/types/pit-scouting.ts
-import type { PitScoutingEntryBase, DrivetrainType, ProgrammingLanguage } from '../core/types/pit-scouting';
-export type { PitScoutingEntryBase, DrivetrainType, ProgrammingLanguage };
+import type {
+  PitScoutingEntryBase,
+  DrivetrainType,
+  ProgrammingLanguage,
+  PathPlannerSoftware,
+  ProgrammingParadigm,
+  TuningStatus,
+  CameraHardware,
+  VisionSoftware,
+  SwerveLibrary,
+  SwerveType,
+  TreadType,
+  IntakeType,
+} from '../core/types/pit-scouting';
+export type {
+  PitScoutingEntryBase,
+  DrivetrainType,
+  ProgrammingLanguage,
+  PathPlannerSoftware,
+  ProgrammingParadigm,
+  TuningStatus,
+  CameraHardware,
+  VisionSoftware,
+  SwerveLibrary,
+  SwerveType,
+  TreadType,
+  IntakeType,
+};
 
 /**
  * Pit scouting database schema

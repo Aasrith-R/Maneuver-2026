@@ -318,9 +318,9 @@ export const strategyAnalysis: StrategyAnalysis<ScoutingEntryTemplate> = {
             acc.noShow += (entry as ScoutingEntryTemplate & { noShow?: boolean }).noShow === true || /no\s*show/i.test(entry.comments || '') ? 1 : 0;
             acc.usedTrenchInTeleop += gameData?.endgame?.usedTrenchInTeleop ? 1 : 0;
             acc.usedBumpInTeleop += gameData?.endgame?.usedBumpInTeleop ? 1 : 0;
-            acc.passedToAllianceFromNeutral += gameData?.endgame?.passedToAllianceFromNeutral ? 1 : 0;
-            acc.passedToAllianceFromOpponent += gameData?.endgame?.passedToAllianceFromOpponent ? 1 : 0;
-            acc.passedToNeutral += gameData?.endgame?.passedToNeutral ? 1 : 0;
+            acc.passedToAllianceFromNeutral += (gameData?.endgame?.ferriedToAllianceFromNeutral || gameData?.endgame?.passedToAllianceFromNeutral) ? 1 : 0;
+            acc.passedToAllianceFromOpponent += (gameData?.endgame?.ferriedToAllianceFromOpponent || gameData?.endgame?.passedToAllianceFromOpponent) ? 1 : 0;
+            acc.passedToNeutral += (gameData?.endgame?.ferriedToNeutral || gameData?.endgame?.passedToNeutral) ? 1 : 0;
             acc.accuracyAll += gameData?.endgame?.accuracyAll ? 1 : 0;
             acc.accuracyMost += gameData?.endgame?.accuracyMost ? 1 : 0;
             acc.accuracySome += gameData?.endgame?.accuracySome ? 1 : 0;
@@ -801,7 +801,9 @@ export const strategyAnalysis: StrategyAnalysis<ScoutingEntryTemplate> = {
                     { key: 'avgTotalFuel', label: 'Total Fuel', type: 'number', color: 'yellow', subtitle: 'avg per match' },
                     { key: 'avgScaledTotalFuel', label: 'Scaled Total Fuel', type: 'number', color: 'green', subtitle: 'TBA-adjusted scout avg' },
                     { key: 'fuelTotalOPR', label: 'Fuel Total OPR', type: 'number', color: 'purple', subtitle: 'alliance decomposition' },
-                    { key: 'avgFuelPassed', label: 'Fuel Passed', type: 'number', color: 'blue', subtitle: 'avg per match' },
+                    { key: 'avgFuelPassed', label: 'Fuel Ferried', type: 'number', color: 'blue', subtitle: 'avg per match' },
+                    { key: 'avgAutoFuelPassed', label: 'Auto Ferried', type: 'number', color: 'blue', subtitle: 'avg per match' },
+                    { key: 'avgTeleopFuelPassed', label: 'Teleop Ferried', type: 'number', color: 'blue', subtitle: 'avg per match' },
                     { key: 'accuracyScore', label: 'Accuracy', type: 'percentage', color: 'green', subtitle: 'from matches with an accuracy selection' },
                     { key: 'statboticsTotalFuel', label: 'Statbotics EPA', type: 'number', color: 'green', subtitle: 'Total Fuel' },
                     { key: 'statboticsTotalTower', label: 'Statbotics EPA', type: 'number', color: 'orange', subtitle: 'Total Tower' },
@@ -919,6 +921,18 @@ export const strategyAnalysis: StrategyAnalysis<ScoutingEntryTemplate> = {
                 ],
             },
             {
+                id: 'ferrying-overview',
+                title: 'Ferrying (Passing)',
+                tab: 'overview',
+                rates: [
+                    { key: 'endgame.passedToAllianceFromNeutralRate', label: 'Neutral → Alliance' },
+                    { key: 'endgame.passedToAllianceFromOpponentRate', label: 'Opponent → Alliance' },
+                    { key: 'endgame.passedToNeutralRate', label: 'Opponent → Neutral' },
+                    { key: 'teleop.ferryOnTheMoveRate', label: 'Ferry On The Move' },
+                    { key: 'teleop.ferryStationaryRate', label: 'Ferry Stationary' },
+                ],
+            },
+            {
                 id: 'climb-breakdown',
                 title: 'Climb Breakdown',
                 tab: 'performance',
@@ -967,9 +981,9 @@ export const strategyAnalysis: StrategyAnalysis<ScoutingEntryTemplate> = {
                     { key: 'bumpStuckRate', label: 'Got Stuck on Bump' },
                     { key: 'usedTrenchInTeleopRate', label: 'Used Trench in Teleop' },
                     { key: 'usedBumpInTeleopRate', label: 'Used Bump in Teleop' },
-                    { key: 'passedToAllianceFromNeutralRate', label: 'Passed to Alliance Zone from Neutral Zone' },
-                    { key: 'passedToAllianceFromOpponentRate', label: 'Passed to Alliance Zone from Opponent Zone' },
-                    { key: 'passedToNeutralRate', label: 'Passed to Neutral Zone from Opponent Zone' },
+                    { key: 'endgame.passedToAllianceFromNeutralRate', label: 'Ferried Neutral → Alliance' },
+                    { key: 'endgame.passedToAllianceFromOpponentRate', label: 'Ferried Opponent → Alliance' },
+                    { key: 'endgame.passedToNeutralRate', label: 'Ferried Opponent → Neutral' },
                 ],
             },
         ];

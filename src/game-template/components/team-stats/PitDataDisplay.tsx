@@ -144,15 +144,35 @@ export function PitDataDisplay({ teamNumber, selectedEvent }: PitDataDisplayProp
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
                                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Drivetrain</span>
-                                    <div className="font-medium text-lg capitalize">{entry.drivetrain || "Unknown"}</div>
+                                    <div className="font-medium text-lg capitalize">{entry.drivetrain || "—"}</div>
                                 </div>
                                 <div className="space-y-1">
                                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Weight</span>
-                                    <div className="font-medium text-lg">{entry.weight ? `${entry.weight} lbs` : "Unknown"}</div>
+                                    <div className="font-medium text-lg">{entry.weight ? `${entry.weight} lbs` : "—"}</div>
                                 </div>
                                 <div className="space-y-1">
-                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Programming</span>
-                                    <div className="font-medium text-lg">{entry.programmingLanguage || "Unknown"}</div>
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Swerve Type</span>
+                                    <div className="font-medium text-lg">{entry.swerveType || "—"}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Gear Ratio</span>
+                                    <div className="font-medium text-lg">{entry.swerveGearRatio || "—"}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Swerve Library</span>
+                                    <div className="font-medium text-lg">{entry.swerveLibrary || "—"}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Intake Type</span>
+                                    <div className="font-medium text-lg">{entry.intakeType || "—"}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tread Type</span>
+                                    <div className="font-medium text-lg">{entry.treadType || "—"}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Last Tread Swap</span>
+                                    <div className="font-medium text-lg">{entry.lastTreadSwap || "—"}</div>
                                 </div>
                                 <div className="space-y-1">
                                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Dimensions</span>
@@ -161,11 +181,9 @@ export function PitDataDisplay({ teamNumber, selectedEvent }: PitDataDisplayProp
                                             const maxLength = entry.gameData?.maxLength;
                                             const maxWidth = entry.gameData?.maxWidth;
                                             const maxHeight = entry.gameData?.maxHeight;
-                                            
                                             if (!maxLength && !maxWidth && !maxHeight) {
-                                                return <span className="text-muted-foreground">-</span>;
+                                                return <span className="text-muted-foreground">—</span>;
                                             }
-                                            
                                             return (
                                                 <div className="text-sm leading-tight">
                                                     {typeof maxLength === 'number' && <div>L: {maxLength}"</div>}
@@ -176,6 +194,39 @@ export function PitDataDisplay({ teamNumber, selectedEvent }: PitDataDisplayProp
                                         })()}
                                     </div>
                                 </div>
+                            </div>
+
+                            <div className="border-t pt-4 grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Language</span>
+                                    <div className="font-medium">{entry.programmingLanguage || "—"}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Paradigm</span>
+                                    <div className="font-medium">{entry.programmingParadigm || "—"}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Path Software</span>
+                                    <div className="font-medium">{entry.pathPlannerSoftware || "—"}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tuning</span>
+                                    <div className="font-medium">{entry.tuningStatus || "—"}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Camera</span>
+                                    <div className="font-medium">{entry.cameraHardware || "—"}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Vision SW</span>
+                                    <div className="font-medium">{entry.visionSoftware || "—"}</div>
+                                </div>
+                                {entry.bestDrivenMatch && (
+                                    <div className="col-span-2 space-y-1">
+                                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Best Match</span>
+                                        <div className="font-medium">{entry.bestDrivenMatch}</div>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
